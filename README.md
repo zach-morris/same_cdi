@@ -1,3 +1,18 @@
+# **SAME_CDI** #
+![SAME_CDI](https://i.imgur.com/hLyVKCp.png)
+
+SAME_CDI is a **S**ingle **A**rcade/**M**achine **E**mulator for libretro, forked from MAME libretro, which is a fork of MAME, and compiles only the Philips CD-I driver, and then sorts out the claptrap of loading the CD file for emulating.  The name removes the name MAME altogether, as thats what I gather the MAME folks want for a fork like this - MAMEs license is below.
+
+*GAME FILES*
+=======
+Game files can be either CHD, ISO.  Game support/functionality is whatever the MAME version included supports.
+
+*BIOS*
+=======
+BIOS file (cdimono1.zip) is required, and can go either in the same directory as your ```CHD|ISO``` files or in the ```retroarch_system_dir/same_cdi/bios/``` directory
+
+--------
+
 # **Libretro notice** #
 
 Before sending bug reports to the upstream bug tracker, make sure the bugs are reproducible in the latest standalone release.
@@ -9,19 +24,6 @@ make -f Makefile.libretro
 ```
 
 --------
-
-# **SAME_CDI** #
-![SAME_CDI](https://i.imgur.com/hLyVKCp.png)
-
-SAME_CDI is a **S**ingle **A**rcade/**M**achine **E**mulator for libretro, forked from MAME libretro, which is a fork of MAME, and compiles only the Philips CD-I driver, and then sorts out the claptrap of loading the CD file for emulating.  The name removes the name MAME altogether, as thats what I gather the MAME folks want for a fork like this - MAMEs license is below.
-
-**GAME FILES**
-=======
-Game files can be either CHD, ISO.  Game support/functionality is whatever the MAME version included supports.
-
-**BIOS**
-=======
-BIOS file (cdimono1.zip) is required, and can go either in the same directory as your ```CHD|ISO``` files or in the ```retroarch_system_dir/same_cdi/bios/``` directory
 
 License
 =======
