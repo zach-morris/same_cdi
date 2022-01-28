@@ -315,7 +315,7 @@ static void Add_Option(const char* option)
       PARAMCOUNT=0;
       first++;
    }
-   log_cb(RETRO_LOG_INFO, "SAME_CDI OPTION = %s\n",option);
+   log_cb(RETRO_LOG_DEBUG, "SAME_CDI OPTION = %s\n",option);
    sprintf(XARGV[PARAMCOUNT++], "%s", option);
 }
 
@@ -508,7 +508,7 @@ static int execute_game(char* path)
    Add_Option(forcedSystem);
     // load chd directly
    if (strlen(gameName) >= strlen("chd")){
-           if(!core_stricmp(&gameName[strlen(gameName)-strlen("chd")], "chd")){
+           if(!core_stricmp(&gameName[strlen(gameName)-strlen("chd")], "chd") || !core_stricmp(&gameName[strlen(gameName)-strlen("iso")], "iso") || !core_stricmp(&gameName[strlen(gameName)-strlen("cue")], "cue")){
                Add_Option((char*)"-cdrom");
                Add_Option((char*)gameName);
            }
