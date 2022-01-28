@@ -1,0 +1,237 @@
+
+VERBOSE ?= 1
+RETRO ?= 1
+NOWERROR ?= 1
+CONFIG ?= libretro"
+NO_USE_MIDI ?= 1
+NO_USE_PORTAUDIO ?= 1
+PTR64 ?= 1
+TARGET ?= mame
+SUBTARGET ?= mess
+SOURCES ?= src/mame/drivers/cdi.cpp
+# OS ?= linux
+# TARGETOS ?= linux
+PYTHON_EXECUTABLE ?= python3
+REGENIE ?= 1
+GITHUB_REPO ?= https://github.com/libretro/mame/
+DEBUG ?= 0
+
+###########################################################################
+#
+#   LIBRETRO PLATFORM GUESSING
+#
+#   If the caller doesn't specify $platform and $ARCH, we guess
+#
+###########################################################################
+
+UNAME_S = $(shell uname -s)
+UNAME_M = $(shell uname -m)
+
+ifeq ($(platform),)
+	platform = unix
+	ifeq ($(UNAME_S),)
+		platform = win
+	else ifneq ($(findstring MINGW,$(UNAME_S)),)
+		platform = win
+	else ifneq ($(findstring MSYS,$(UNAME_S)),)
+		platform = win
+	else ifneq ($(findstring Darwin,$(UNAME_S)),)
+		platform = osx
+	else ifneq ($(findstring win,$(UNAME_S)),)
+		platform = win
+	else ifeq ($(UNAME_M), "i686")
+		platform = linux32
+	endif
+endif
+ifeq ($(ARCH),)
+	LIBRETRO_CPU = $(ARCH)
+endif
+ifeq ($(LIBRETRO_CPU),)
+	ifeq ($(UNAME_M),)
+		ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
+			LIBRETRO_CPU = x86_64
+		endif
+		ifeq ($(PROCESSOR_ARCHITEW6432),AMD64)
+			LIBRETRO_CPU = x86_64
+		endif
+	else ifeq ($(UNAME_M),amd64)
+		LIBRETRO_CPU = x86_64
+	else
+		LIBRETRO_CPU = $(UNAME_M)
+	endif
+endif
+
+ifeq ($(ARCH),x86)
+	PTR64 := 0
+endif
+
+###########################################################################
+#
+#   BUILD FLAGS
+#
+###########################################################################
+
+BUILDFLAGS = RETRO=$(RETRO) REGENIE=$(REGENIE) VERBOSE=$(VERBOSE) NOWERROR=$(NOWERROR) OSD="retro" NO_USE_MIDI=$(NO_USE_MIDI) NO_USE_PORTAUDIO=$(NO_USE_PORTAUDIO)
+
+ifneq ($(PYTHON_EXECUTABLE),)
+	BUILDFLAGS += PYTHON_EXECUTABLE=$(PYTHON_EXECUTABLE)
+endif
+ifeq ($(DEBUG),1)
+	BUILDFLAGS += CONFIG=libretrodbg
+	BUILDFLAGS += SYMBOLS=1 SYMLEVEL=2 OPTIMIZE=0
+else
+	BUILDFLAGS += CONFIG=libretro
+endif
+
+###########################################################################
+#
+#   PLATFORM FLAGS
+#
+###########################################################################
+
+PLATFLAGS =
+
+ifneq ($(findstring win,$(platform)),)
+	ifeq ($(MSYSTEM),MINGW64)
+		MINGW64 ?= /mingw64
+		PLATFLAGS += MINGW64="$(MINGW64)"
+		LIBRETRO_CPU="x86_64"
+	else ifeq ($(MSYSTEM),MINGW32)
+		MINGW32 ?= /mingw32
+		PLATFLAGS += MINGW32="$(MINGW32)"
+		LIBRETRO_CPU="x86"
+		PTR64=0
+	endif
+	CC  ?= cc
+	CXX ?= cxx
+	AR  ?= ar
+	PLATFLAGS += TARGETOS="windows" OVERRIDE_CC="$(CC)" OVERRIDE_CXX="$(CXX)" "AR=$(AR)"
+	ifneq ($(WINDRES),)
+		PLATFLAGS += WINDRES="$(WINDRES)"
+	endif
+endif
+
+ifeq ($(platform),android-arm)
+	ANDROID_NDK_LLVM ?= /opt/ndk/toolchains/llvm/prebuilt/linux-x86_64
+	ANDROID_NDK_ARM  ?= /opt/ndk/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64
+	ANDROID_NDK_ROOT ?= /opt/ndk
+	PLATFLAGS += TARGETOS="android-arm" gcc="android-arm"
+	PLATFLAGS +=  ANDROID_NDK_LLVM="$(ANDROID_NDK_LLVM)"
+	PLATFLAGS +=  ANDROID_NDK_ARM="$(ANDROID_NDK_ARM)"
+	PLATFLAGS +=  ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)"
+	LIBRETRO_CPU :=
+	ARCH :=
+	LIBRETRO_OS :=
+	PTR64 := 
+endif
+ifeq ($(platform),android-arm64)
+	ANDROID_NDK_LLVM  ?= /opt/ndk/toolchains/llvm/prebuilt/linux-x86_64
+	ANDROID_NDK_ARM64 ?= /opt/ndk/toolchains/aarch64-linux-android-4.9/prebuilt/linux-x86_64
+	ANDROID_NDK_ROOT  ?= /opt/ndk
+	PLATFLAGS += TARGETOS="android-arm64" gcc="android-arm64"
+	PLATFLAGS += ANDROID_NDK_LLVM="$(ANDROID_NDK_LLVM)"
+	PLATFLAGS += ANDROID_NDK_ARM64="$(ANDROID_NDK_ARM64)"
+	PLATFLAGS += ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)"
+	LIBRETRO_CPU :=
+	ARCH :=
+	LIBRETRO_OS :=
+	PTR64 :=
+endif
+ifeq ($(platform),android-x86_64)
+	ANDROID_NDK_LLVM  ?= /opt/ndk/toolchains/llvm/prebuilt/linux-x86_64
+	ANDROID_NDK_X64 ?= /opt/ndk/toolchains/x86_64-4.9/prebuilt/linux-x86_64
+	ANDROID_NDK_ROOT  ?= /opt/ndk
+	PLATFLAGS += TARGETOS="android-x64" gcc="android-x64"
+	PLATFLAGS += ANDROID_NDK_LLVM="$(ANDROID_NDK_LLVM)"
+	PLATFLAGS += ANDROID_NDK_X64="$(ANDROID_NDK_X64)"
+	PLATFLAGS += ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)"
+	LIBRETRO_CPU :=
+	ARCH :=
+	LIBRETRO_OS :=
+	PTR64 :=
+endif
+
+ifeq ($(platform),linux32)
+	PTR64 := 0
+endif
+
+ifeq ($(platform),osx)
+  PLATFLAGS += DONT_USE_NETWORK=1
+endif
+
+ifeq ($(platform),ios-arm64)
+  PLATFLAGS += DONT_USE_NETWORK=1
+	LIBRETRO_CPU = arm64
+	ARCH = arm64
+	LIBRETRO_OS = ios-arm64
+	IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
+	CC = cc -arch arm64 -isysroot $(IOSSDK) -miphoneos-version-min=11.0
+	CXX = c++ -arch arm64 -isysroot $(IOSSDK) -miphoneos-version-min=11.0
+	PLATFLAGS += OVERRIDE_CC="$(CC)" OVERRIDE_CXX="$(CXX)"
+endif
+
+ifeq ($(platform),tvos-arm64)
+  PLATFLAGS += DONT_USE_NETWORK=1
+	LIBRETRO_CPU = arm64
+	ARCH = arm64
+	LIBRETRO_OS = ios-arm64
+	IOSSDK := $(shell xcodebuild -version -sdk appletvos Path)
+	CC = cc -arch arm64 -isysroot $(IOSSDK)
+	CXX = c++ -arch arm64 -isysroot $(IOSSDK)
+	PLATFLAGS += OVERRIDE_CC="$(CC)" OVERRIDE_CXX="$(CXX)"
+endif
+
+ifneq ($(LIBRETRO_CPU),)
+	PLATFLAGS += ARCH="" LIBRETRO_CPU="$(LIBRETRO_CPU)"
+endif
+ifneq ($(FORCE_DRC_C_BACKEND),)
+	PLATFLAGS += FORCE_DRC_C_BACKEND="$(FORCE_DRC_C_BACKEND)"
+endif
+ifneq ($(LIBRETRO_OS),)
+	PLATFLAGS += LIBRETRO_OS="$(platform)"
+endif
+ifneq ($(PTR64),)
+	PLATFLAGS += PTR64=$(PTR64)
+endif
+
+###########################################################################
+#
+#   TARGET FLAGS
+#
+###########################################################################
+
+TARGETFLAGS =
+ifneq ($(TARGET),)
+	TARGETFLAGS += TARGET=$(TARGET)
+endif
+ifneq ($(SUBTARGET),)
+	TARGETFLAGS += SUBTARGET=$(SUBTARGET)
+endif
+ifneq ($(SOURCES),)
+	TARGETFLAGS += SOURCES=$(SOURCES)
+endif
+
+###########################################################################
+#
+#   MAKE RULES
+#
+#   We just call upstream GENie here with appropriate args
+#
+###########################################################################
+
+# MAKEFILE is set by libretro gitlab-ci, but it confuses GENIE. So, unset it.
+# undefine <var> is not supported on make 3.81 (used by macosx).
+MAKEFILE :=
+
+all: build
+
+build:
+	$(MAKE) $(BUILDFLAGS) $(PLATFLAGS) $(TARGETFLAGS)
+
+vs2015:
+	$(MAKE) $(BUILDFLAGS) $(PLATFLAGS) $(TARGETFLAGS) vs2015
+
+clean:
+	$(MAKE) $(BUILDFLAGS) $(PLATFLAGS) $(TARGETFLAGS) clean
+
+.PHONY: all build clean vs2015
