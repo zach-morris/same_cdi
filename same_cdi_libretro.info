@@ -29,14 +29,18 @@ disk_control = "false"
 database_match_archive_member = "true"
 
 # BIOS/Firmware
-firmware_count = 2
+firmware_count = 3
 
 firmware0_desc = "same_cdi/bios/cdimono1.zip"
 firmware0_path = "same_cdi/bios/cdimono1.zip"
 firmware0_opt = "false"
 
-firmware1_desc = "same_cdi/bios/cdibios.zip"
-firmware1_path = "same_cdi/bios/cdibios.zip"
+firmware1_desc = "same_cdi/bios/cdimono2.zip"
+firmware1_path = "same_cdi/bios/cdimono2.zip"
 firmware1_opt = "true"
 
-description = "SAME CDi is a S. ingle A. rcade/M. achine E. mulator for libretro, forked from MAME libretro, which is a fork of MAME, and compiles only the Philips CD-I driver, and then sorts out the claptrap of loading the CD file for emulating."
+firmware2_desc = "same_cdi/bios/cdibios.zip"
+firmware2_path = "same_cdi/bios/cdibios.zip"
+firmware2_opt = "true"
+
+description = "SAME CDi is a S. ingle A. rcade/M. achine E. mulator for libretro, forked from MAME libretro, which is a fork of MAME (its the same, get it?), and compiles only the Philips CD-I driver, and then sorts out the claptrap of loading the CD file for emulating."
