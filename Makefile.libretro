@@ -228,6 +228,12 @@ all: build
 build:
 	$(MAKE) $(BUILDFLAGS) $(PLATFLAGS) $(TARGETFLAGS)
 
+	@echo "Renaming compiled target"
+	@mv mess_libretro.dylib same_cdi_libretro.dylib 2> /dev/null || true
+	@mv mess_libretro.dll same_cdi_libretro.dll 2> /dev/null || true
+	@mv mess_libretro.so same_cdi_libretro.so 2> /dev/null || true
+	@echo "Done!"
+
 vs2015:
 	$(MAKE) $(BUILDFLAGS) $(PLATFLAGS) $(TARGETFLAGS) vs2015
 
