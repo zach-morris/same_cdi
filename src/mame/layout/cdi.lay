@@ -32,7 +32,13 @@ license:CC0
 			<bounds x="0" y="0" width="192" height="22" />
 		</screen>
 		<screen index="0">
-			<bounds x="0" y="22" width="384" height="288" />
+			<bounds left="0" top="0" right="~scr0width~" bottom="~scr0height~" />
+		</screen>
+	</view>
+
+	<view name="Main Screen Only">
+		<screen index="0">
+			<bounds left="0" top="0" right="~scr0width~" bottom="~scr0height~" />
 		</screen>
 	</view>
 
