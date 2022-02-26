@@ -36,13 +36,15 @@ public:
 	virtual void output_callback(osd_output_channel channel, const util::format_argument_pack<std::ostream> &args) override
 	{
 		std::ostringstream buffer;
-		retro_log_level lvl;
+		std::string buffer_str;
+		retro_log_level lvl = RETRO_LOG_INFO;
 
 		util::stream_format(buffer, args);
+		buffer_str = buffer.str();
 		
 		switch(channel) {
 			case OSD_OUTPUT_CHANNEL_ERROR:
-				frontend_message.msg    = buffer.str().c_str();
+				frontend_message.msg    = buffer_str.c_str();
   				frontend_message.frames = 60*5;
   				environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &frontend_message);
 				lvl = RETRO_LOG_ERROR;
@@ -61,7 +63,7 @@ public:
 				break;	
 		}
 		
-		log_cb(lvl, buffer.str().c_str());
+		log_cb(lvl, buffer_str.c_str());
 	}
 };
 

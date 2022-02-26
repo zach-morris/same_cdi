@@ -1,5 +1,5 @@
 # Software Information
-display_name = "Philips - CDi"
+display_name = "Philips - CDi (SAME CDi)"
 authors = "MAMEdev"
 supported_extensions = "chd|iso"
 corename = "SAME CDi (Git)"
@@ -43,4 +43,4 @@ firmware2_desc = "same_cdi/bios/cdibios.zip"
 firmware2_path = "same_cdi/bios/cdibios.zip"
 firmware2_opt = "true"
 
-description = "SAME CDi is a S. ingle A. rcade/M. achine E. mulator for libretro, forked from MAME libretro, which is a fork of MAME (its the same, get it?), and compiles only the Philips CD-I driver, and then sorts out the claptrap of loading the CD file for emulating."
+description = "SAME CDi is a S(ingle) A(rcade) M(achine) E(mulator) for libretro, forked from MAME libretro, which is in turn a fork of MAME. It includes only the Philips CD-i driver, and simplifies the loading of CD content to provide a 'plug and play' experience."
