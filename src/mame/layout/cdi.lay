@@ -38,7 +38,7 @@ license:CC0
 
 	<view name="Main Screen Only">
 		<screen index="0">
-			<bounds left="0" top="0" right="~scr0width~" bottom="~scr0height~" />
+			<bounds left="0" top="0" right="4" bottom="3" />
 		</screen>
 	</view>
 

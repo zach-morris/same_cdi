@@ -168,7 +168,7 @@ void retro_set_environment(retro_environment_t cb)
     { option_write_config, "Write configuration; disabled|enabled" },
     { option_saves, "Save state naming; game|system" },
     { option_auto_save, "Auto save/load states; disabled|enabled" },
-    { option_mouse, "Enable in-game mouse; disabled|enabled" },
+    { option_mouse, "Enable in-game mouse; enabled|disabled" },
     { option_lightgun, "Lightgun mode; none|touchscreen|lightgun" },
     { option_buttons_profiles, "Profile Buttons according to games (Restart); enabled|disabled" },
     { option_throttle, "Enable throttle; disabled|enabled" },
