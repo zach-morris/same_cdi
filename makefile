@@ -651,18 +651,6 @@ PARAMS += --with-tools
 endif
 endif
 
-ifdef TESTS
-ifneq '$(TESTS)' '0'
-PARAMS += --with-tests
-endif
-endif
-
-ifdef BENCHMARKS
-ifneq '$(BENCHMARKS)' '0'
-PARAMS += --with-benchmarks
-endif
-endif
-
 ifdef SYMLEVEL
 PARAMS += --SYMLEVEL='$(SYMLEVEL)'
 endif
@@ -919,8 +907,6 @@ SCRIPTS = scripts/genie.lua \
 	$(wildcard scripts/src/osd/$(OSD)*.lua) \
 	scripts/src/sound.lua \
 	scripts/src/tools.lua \
-	scripts/src/tests.lua \
-	scripts/src/benchmarks.lua \
 	scripts/src/video.lua \
 	scripts/src/bus.lua \
 	scripts/src/netlist.lua \
@@ -1629,16 +1615,6 @@ ifdef IGNORE_BAD_LOCALISATION
 else
 	$(SILENT)$(PYTHON) scripts/build/msgfmt.py --output-file $@ $<
 endif
-
-#-------------------------------------------------
-# Regression tests
-#-------------------------------------------------
-
-include regtests/regtests.mak
-
-.PHONY: tests
-
-tests: $(REGTESTS)
 
 #-------------------------------------------------
 # Source cleanup

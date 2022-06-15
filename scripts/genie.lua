@@ -123,11 +123,6 @@ newoption {
 }
 
 newoption {
-	trigger = "with-benchmarks",
-	description = "Enable building benchmarks.",
-}
-
-newoption {
 	trigger = "osd",
 	description = "Choose OSD layer implementation",
 }
@@ -1518,11 +1513,6 @@ end
 if _OPTIONS["with-tests"] then
 	group "tests"
 	dofile(path.join("src", "tests.lua"))
-end
-
-if _OPTIONS["with-benchmarks"] then
-	group "benchmarks"
-	dofile(path.join("src", "benchmarks.lua"))
 end
 
 function generate_has_header(hashname, hash)
