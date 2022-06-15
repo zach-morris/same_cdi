@@ -55,9 +55,6 @@ private:
 	void scsibus_read_data();
 	void scsibus_write_data();
 	void scsibus_exec_command();
-	void dump_command_bytes();
-	void dump_data_bytes(int count);
-	void dump_bytes(uint8_t *buff, int count);
 
 	emu_timer *req_timer;
 	emu_timer *sel_timer;

@@ -150,35 +150,9 @@ void scsihle_device::scsi_out_req_delay(uint8_t state)
 	req_timer->adjust(attotime::from_nsec(REQ_DELAY_NS),state);
 }
 
-void scsihle_device::dump_bytes(uint8_t *buff, int count)
-{
-	int byteno;
-
-	for(byteno=0; byteno<count; byteno++)
-	{
-		logerror("%02X ",buff[byteno]);
-	}
-}
-
-void scsihle_device::dump_command_bytes()
-{
-	logerror("sending command 0x%02X to ScsiID %d\n",command[0],scsiID);
-	dump_bytes(command,cmd_idx);
-	logerror("\n\n");
-}
-
-void scsihle_device::dump_data_bytes(int count)
-{
-	logerror("Data buffer[0..%d]\n",count);
-	dump_bytes(buffer,count);
-	logerror("\n\n");
-}
-
 void scsihle_device::scsibus_read_data()
 {
 	data_last = (bytes_left >= m_sector_bytes) ? m_sector_bytes : bytes_left;
-
-	LOG(2,"SCSIBUS:scsibus_read_data bytes_left=%04X, data_last=%04X\n",bytes_left,data_last);
 
 	data_idx=0;
 
@@ -194,8 +168,6 @@ void scsihle_device::scsibus_read_data()
 void scsihle_device::scsibus_write_data()
 {
 	data_last = (bytes_left >= m_sector_bytes) ? m_sector_bytes : bytes_left;
-
-	LOG(2,"SCSIBUS:scsibus_write_data bytes_left=%04X, data_last=%04X\n",bytes_left,data_last);
 
 	if (data_last > 0)
 	{
@@ -234,9 +206,6 @@ void scsihle_device::scsibus_exec_command()
 {
 	int command_local = 0;
 
-	if (LOGLEVEL)
-		dump_command_bytes();
-
 	//is_linked=command[cmd_idx-1] & 0x01;
 	is_linked=0;
 
@@ -245,7 +214,6 @@ void scsihle_device::scsibus_exec_command()
 	{
 		// Format unit
 		case SCSI_CMD_FORMAT_UNIT:
-			LOG(1,"SCSIBUS: format unit command[1]=%02X & 0x10\n",(command[1] & 0x10));
 			command_local=1;
 			if ((command[1] & 0x10)==0x10)
 				m_phase = SCSI_PHASE_DATAOUT;
@@ -258,7 +226,6 @@ void scsihle_device::scsibus_exec_command()
 			break;
 
 		case SCSI_CMD_SEARCH_DATA_EQUAL:
-			LOG(1,"SCSIBUS: Search_data_equaln");
 			command_local=1;
 			bytes_left=0;
 			m_phase = SCSI_PHASE_STATUS;
@@ -266,7 +233,6 @@ void scsihle_device::scsibus_exec_command()
 			break;
 
 		case SCSI_CMD_READ_DEFECT:
-			LOG(1,"SCSIBUS: read defect list\n");
 			command_local=1;
 
 			buffer[0] = 0x00;
@@ -281,7 +247,6 @@ void scsihle_device::scsibus_exec_command()
 
 		// write buffer
 		case SCSI_CMD_BUFFER_WRITE:
-			LOG(1,"SCSIBUS: write_buffer\n");
 			command_local=1;
 			bytes_left=(command[7]<<8)+command[8];
 			m_phase = SCSI_PHASE_DATAOUT;
@@ -290,7 +255,6 @@ void scsihle_device::scsibus_exec_command()
 
 		// read buffer
 		case SCSI_CMD_BUFFER_READ:
-			LOG(1,"SCSIBUS: read_buffer\n");
 			command_local=1;
 			bytes_left = (command[7]<<8) + command[8];
 			m_phase = SCSI_PHASE_DATAIN;
@@ -310,8 +274,6 @@ void scsihle_device::scsibus_exec_command()
 	}
 
 	scsi_change_phase(m_phase);
-
-	LOG(1,"SCSIBUS:bytes_left=%02X data_idx=%02X\n",bytes_left,data_idx);
 
 	// This is correct as we need to read from disk for commands other than just read data
 	if ((m_phase == SCSI_PHASE_DATAIN) && (!command_local))
@@ -336,8 +298,6 @@ uint8_t scsihle_device::scsibus_driveno(uint8_t drivesel)
 
 void scsihle_device::scsi_change_phase(uint8_t newphase)
 {
-	LOG(1,"scsi_change_phase() from=%s, to=%s\n",phasenames[m_phase],phasenames[newphase]);
-
 	m_phase=newphase;
 	cmd_idx=0;
 	data_idx=0;
@@ -355,7 +315,6 @@ void scsihle_device::scsi_change_phase(uint8_t newphase)
 			// atn
 			// rst
 			data_out(0);
-			LOG(1,"SCSIBUS: done\n\n");
 			break;
 
 		case SCSI_PHASE_COMMAND:
@@ -364,7 +323,6 @@ void scsihle_device::scsi_change_phase(uint8_t newphase)
 			output_msg(0);
 			scsi_out_req_delay(1);
 			data_out(0);
-			LOG(1,"\nSCSIBUS: Command begin\n");
 			break;
 
 		case SCSI_PHASE_DATAOUT:
@@ -492,7 +450,6 @@ WRITE_LINE_MEMBER( scsihle_device::input_ack )
 		case SCSI_PHASE_DATAOUT:
 			if (!state)
 			{
-				//LOG(1,"SCSIBUS:bytes_left=%02X data_idx=%02X\n",bytes_left,data_idx);
 				buffer[data_idx++] = m_input_data;
 
 				if (IS_COMMAND(SCSI_CMD_FORMAT_UNIT))
@@ -506,8 +463,6 @@ WRITE_LINE_MEMBER( scsihle_device::input_ack )
 					if (data_idx == 3)
 					{
 						bytes_left += ((buffer[2]<<8) + buffer[3]);
-						LOG(1, "format_unit reading an extra %d bytes\n", bytes_left - 4);
-						dump_data_bytes(4);
 					}
 				}
 
