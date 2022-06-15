@@ -527,9 +527,7 @@ auto lua_engine::make_simple_callback_setter(void (T::*setter)(delegate<R ()> &&
 template <typename TFunc, typename... TArgs>
 inline sol::protected_function_result lua_engine::invoke(TFunc &&func, TArgs &&... args)
 {
-	g_profiler.start(PROFILER_LUA);
 	sol::protected_function_result result = func(std::forward<TArgs>(args)...);
-	g_profiler.stop();
 	return result;
 }
 

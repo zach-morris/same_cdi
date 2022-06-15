@@ -11,10 +11,6 @@
 #include "emu.h"
 #include "debugger.h"
 
-//**************************************************************************
-//  DEBUGGING
-//**************************************************************************
-
 #define PRECISION
 
 
@@ -284,25 +280,6 @@ inline void emu_timer::schedule_next_period()
 	scheduler.timer_list_insert(*this);
 }
 
-
-//-------------------------------------------------
-//  dump - dump internal state to a single output
-//  line in the error log
-//-------------------------------------------------
-
-void emu_timer::dump() const
-{
-	machine().logerror("%p: en=%d temp=%d exp=%15s start=%15s per=%15s param=%d ptr=%p", this, m_enabled, m_temporary, m_expire.as_string(PRECISION), m_start.as_string(PRECISION), m_period.as_string(PRECISION), m_param, m_ptr);
-	if (m_device == nullptr)
-		if (m_callback.name() == nullptr)
-			machine().logerror(" cb=NULL\n");
-		else
-			machine().logerror(" cb=%s\n", m_callback.name());
-	else
-		machine().logerror(" dev=%s id=%d\n", m_device->tag(), m_id);
-}
-
-
 //-------------------------------------------------
 //  device_timer_expired - trampoline to avoid a
 //  conditional jump on the hot path
@@ -384,11 +361,7 @@ bool device_scheduler::can_save() const
 	// if any live temporary timers exit, fail
 	for (emu_timer *timer = m_timer_list; timer != nullptr; timer = timer->next())
 		if (timer->m_temporary && !timer->expire().is_never())
-		{
-			machine().logerror("Failed save state attempt due to anonymous timers:\n");
-			dump_timers();
 			return false;
-		}
 
 	// otherwise, we're good
 	return true;
@@ -476,8 +449,6 @@ void device_scheduler::timeslice()
 					// if we're not suspended, actually execute
 					if (exec->m_suspend == 0)
 					{
-						g_profiler.start(exec->m_profiler);
-
 						// note that this global variable cycles_stolen can be modified
 						// via the call to cpu_execute
 						exec->m_cycles_stolen = 0;
@@ -497,7 +468,6 @@ void device_scheduler::timeslice()
 						ran -= *exec->m_icountptr;
 						assert(ran >= exec->m_cycles_stolen);
 						ran -= exec->m_cycles_stolen;
-						g_profiler.stop();
 					}
 
 					// account for these cycles
@@ -867,12 +837,8 @@ inline void device_scheduler::execute_timers()
 		// call the callback
 		if (was_enabled)
 		{
-			g_profiler.start(PROFILER_TIMER_CALLBACK);
-
 			if (!timer.m_callback.isnull())
 				timer.m_callback(timer.m_ptr, timer.m_param);
-
-			g_profiler.stop();
 		}
 
 		// reset or remove the timer, but only if it wasn't modified during the callback
@@ -935,18 +901,4 @@ void device_scheduler::add_scheduling_quantum(const attotime &quantum, const att
 		quant.m_expire = expire;
 		m_quantum_list.insert_after(quant, insert_after);
 	}
-}
-
-
-//-------------------------------------------------
-//  dump_timers - dump the current timer state
-//-------------------------------------------------
-
-void device_scheduler::dump_timers() const
-{
-	machine().logerror("=============================================\n");
-	machine().logerror("Timer Dump: Time = %15s\n", time().as_string(PRECISION));
-	for (emu_timer *timer = first_timer(); timer != nullptr; timer = timer->next())
-		timer->dump();
-	machine().logerror("=============================================\n");
 }

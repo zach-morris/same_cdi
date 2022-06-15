@@ -231,9 +231,7 @@ void video_manager::frame_update(bool from_debugger)
 		update_throttle(current_time);
 
 	// ask the OSD to update
-	g_profiler.start(PROFILER_BLIT);
 	machine().osd().update(!from_debugger && skipped_it);
-	g_profiler.stop();
 
 	// we synchronize after rendering instead of before, if low latency mode is enabled
 	if (!from_debugger && !skipped_it && phase > machine_phase::INIT && m_low_latency && effective_throttle())
@@ -701,11 +699,7 @@ void video_manager::update_throttle(attotime emutime)
 		// wrong and requires a resync
 		attoseconds_t emu_delta_attoseconds = (emutime - m_throttle_emutime).as_attoseconds();
 		if (emu_delta_attoseconds < 0 || emu_delta_attoseconds > ATTOSECONDS_PER_SECOND / 10)
-		{
-			if (LOG_THROTTLE)
-				machine().logerror("Resync due to weird emutime delta: %s\n", attotime(0, emu_delta_attoseconds).as_string(18));
 			break;
-		}
 
 		// now determine the current real time in OSD-specified ticks; we have to be careful
 		// here because counters can wrap, so we only use the difference between the last
@@ -716,11 +710,7 @@ void video_manager::update_throttle(attotime emutime)
 		// if it has been more than a full second of real time since the last call to this
 		// function, we just need to resynchronize
 		if (diff_ticks >= ticks_per_second)
-		{
-			if (LOG_THROTTLE)
-				machine().logerror("Resync due to real time advancing by more than 1 second\n");
 			break;
-		}
 
 		// convert this value into attoseconds for easier comparison
 		attoseconds_t real_delta_attoseconds = diff_ticks * attoseconds_per_tick;
@@ -742,11 +732,7 @@ void video_manager::update_throttle(attotime emutime)
 		// is taking longer than the real frame, we just need to resync
 		if (real_is_ahead_attoseconds < -ATTOSECONDS_PER_SECOND / 10 ||
 			(real_is_ahead_attoseconds < 0 && population_count_32(m_throttle_history & 0xff) < 6))
-		{
-			if (LOG_THROTTLE)
-				machine().logerror("Resync due to being behind: %s (history=%08X)\n", attotime(0, -real_is_ahead_attoseconds).as_string(18), m_throttle_history);
 			break;
-		}
 
 		// if we're behind, it's time to just get out
 		if (real_is_ahead_attoseconds < 0)
@@ -780,7 +766,6 @@ osd_ticks_t video_manager::throttle_until_ticks(osd_ticks_t target_ticks)
 	bool const allowed_to_sleep = (machine().options().sleep() && (!effective_autoframeskip() || effective_frameskip() == 0)) || machine().paused();
 
 	// loop until we reach our target
-	g_profiler.start(PROFILER_IDLE);
 	osd_ticks_t current_ticks = osd_ticks();
 	while (current_ticks < target_ticks)
 	{
@@ -809,14 +794,10 @@ osd_ticks_t video_manager::throttle_until_ticks(osd_ticks_t target_ticks)
 				// take 99% of the previous average plus 1% of the new value
 				osd_ticks_t const oversleep_milliticks = 1000 * (actual_ticks - delta);
 				m_average_oversleep = (m_average_oversleep * 99 + oversleep_milliticks) / 100;
-
-				if (LOG_THROTTLE)
-					machine().logerror("Slept for %d ticks, got %d ticks, avgover = %d\n", (int)delta, (int)actual_ticks, (int)m_average_oversleep);
 			}
 		}
 		current_ticks = new_ticks;
 	}
-	g_profiler.stop();
 
 	return current_ticks;
 }
@@ -1185,8 +1166,6 @@ void video_manager::record_frame()
 	if (!is_recording())
 		return;
 
-	// start the profiler and get the current time
-	g_profiler.start(PROFILER_MOVIE_REC);
 	attotime curtime = machine().time();
 
 	bool error = false;
@@ -1205,7 +1184,6 @@ void video_manager::record_frame()
 
 	if (error)
 		end_recording();
-	g_profiler.stop();
 }
 
 

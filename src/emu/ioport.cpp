@@ -94,7 +94,6 @@
 #include "emuopts.h"
 #include "config.h"
 #include "xmlfile.h"
-#include "profiler.h"
 #include "ui/uimain.h"
 #include "inputdev.h"
 #include "natkeyboard.h"
@@ -1747,8 +1746,6 @@ time_t ioport_manager::initialize()
 	{
 		std::string errors;
 		m_portlist.append(device, errors);
-		if (!errors.empty())
-			osd_printf_error("Input port errors:\n%s", errors);
 	}
 
 	// renumber player numbers for controller ports
@@ -1861,7 +1858,6 @@ void ioport_manager::init_autoselect_devices(int type1, int type2, int type3, co
 		}
 	if (autoenable_class == nullptr)
 	{
-		osd_printf_error("Invalid %s value %s; reverting to keyboard\n", option, stemp);
 		autoenable_class = &machine().input().device_class(DEVICE_CLASS_KEYBOARD);
 	}
 
@@ -1873,7 +1869,6 @@ void ioport_manager::init_autoselect_devices(int type1, int type2, int type3, co
 				// if this port type is in use, apply the autoselect criteria
 				if ((type1 != 0 && field.type() == type1) || (type2 != 0 && field.type() == type2) || (type3 != 0 && field.type() == type3))
 				{
-					osd_printf_verbose("Input: Autoenabling %s due to presence of a %s\n", autoenable_class->name(), ananame);
 					autoenable_class->enable();
 					break;
 				}
@@ -2067,8 +2062,6 @@ void ioport_manager::frame_update_callback()
 
 void ioport_manager::frame_update()
 {
-	g_profiler.start(PROFILER_INPUT);
-
 	// record/playback information about the current frame
 	attotime curtime = machine().time();
 	playback_frame(curtime);
@@ -2104,8 +2097,6 @@ void ioport_manager::frame_update()
 			if (dynfield.field().type() != IPT_OUTPUT)
 				dynfield.write(newvalue);
 	}
-
-	g_profiler.stop();
 }
 
 
@@ -2405,30 +2396,6 @@ bool ioport_manager::load_controller_config(
 					field.live().toggle = false;
 					field.m_flags &= ~ioport_field::FIELD_FLAG_TOGGLE;
 				}
-			}
-			else
-			{
-				// for analog fields
-
-#if 0 // changing this stuff causes issues because of the way it's tied up with the analog_field object
-				// get base attributes
-				field.live().analog->m_delta = field.m_delta = portnode.get_attribute_int("keydelta", field.delta());
-				field.live().analog->m_centerdelta = field.m_centerdelta = portnode.get_attribute_int("centerdelta", field.centerdelta());
-				field.live().analog->m_sensitivity = field.m_sensitivity = portnode.get_attribute_int("sensitivity", field.sensitivity());
-
-				// fetch yes/no for reverse setting
-				char const *const revstring = portnode.get_attribute_string("reverse", nullptr);
-				if (revstring && !strcmp(revstring, "yes"))
-				{
-					field.live().analog->m_reverse = true;
-					field.m_flags |= ioport_field::ANALOG_FLAG_REVERSE;
-				}
-				else if (revstring && !strcmp(revstring, "no"))
-				{
-					field.live().analog->m_reverse = false;
-					field.m_flags &= ~ioport_field::ANALOG_FLAG_REVERSE;
-				}
-#endif
 			}
 
 			// successfully applied
@@ -2813,16 +2780,10 @@ time_t ioport_manager::playback_init()
 		fatalerror("Input file format version mismatch\n");
 
 	// output info to console
-	osd_printf_info("Input file: %s\n", filename);
-	osd_printf_info("INP version %u.%u\n", header.get_majversion(), header.get_minversion());
 	time_t basetime = header.get_basetime();
-	osd_printf_info("Created %s\n", ctime(&basetime));
-	osd_printf_info("Recorded using %s\n", header.get_appdesc());
 
 	// verify the header against the current game
 	std::string const sysname = header.get_sysname();
-	if (sysname != machine().system().name)
-		osd_printf_info("Input file is for machine '%s', not for current machine '%s'\n", sysname, machine().system().name);
 
 	// enable compression
 	m_playback_stream = util::zlib_read(m_playback_file, 16386);
@@ -2850,15 +2811,10 @@ void ioport_manager::playback_end(const char *message)
 		// display speed stats
 		if (m_playback_accumulated_speed > 0)
 			m_playback_accumulated_speed /= m_playback_accumulated_frames;
-		osd_printf_info("Total playback frames: %d\n", u32(m_playback_accumulated_frames));
-		osd_printf_info("Average recorded speed: %d%%\n", u32((m_playback_accumulated_speed * 200 + 1) >> 21));
 
 		// close the program at the end of inp file playback
 		if (machine().options().exit_after_playback())
-		{
-			osd_printf_info("Exiting MAME now...\n");
 			machine().schedule_exit();
-		}
 	}
 }
 

@@ -77,7 +77,6 @@ private:
 	// internal helpers
 	void register_save();
 	void schedule_next_period();
-	void dump() const;
 	static void device_timer_expired(emu_timer &timer, void *ptr, s32 param);
 
 	// internal state
@@ -131,9 +130,6 @@ public:
 	// timers, specified by device/id; generally devices should use the device_t methods instead
 	emu_timer *timer_alloc(device_t &device, device_timer_id id = 0, void *ptr = nullptr);
 	void timer_set(const attotime &duration, device_t &device, device_timer_id id = 0, int param = 0, void *ptr = nullptr);
-
-	// debugging
-	void dump_timers() const;
 
 	// for emergencies only!
 	void eat_all_cycles();

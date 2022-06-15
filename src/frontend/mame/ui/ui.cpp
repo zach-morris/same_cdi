@@ -974,7 +974,6 @@ bool mame_ui_manager::show_fps_counter()
 void mame_ui_manager::set_show_profiler(bool show)
 {
 	m_show_profiler = show;
-	g_profiler.enable(show);
 }
 
 
@@ -1135,22 +1134,6 @@ void mame_ui_manager::draw_fps_counter(render_container &container)
 
 
 //-------------------------------------------------
-//  draw_profiler
-//-------------------------------------------------
-
-void mame_ui_manager::draw_profiler(render_container &container)
-{
-	std::string_view text = g_profiler.text(machine());
-	draw_text_full(
-			container,
-			text,
-			0.0f, 0.0f, 1.0f,
-			ui::text_layout::text_justify::LEFT, ui::text_layout::word_wrapping::WORD,
-			OPAQUE_, rgb_t::white(), rgb_t::black(), nullptr, nullptr);
-}
-
-
-//-------------------------------------------------
 //  start_save_state
 //-------------------------------------------------
 
@@ -1217,10 +1200,6 @@ uint32_t mame_ui_manager::handler_ingame(render_container &container)
 	// first draw the FPS counter
 	if (show_fps_counter())
 		draw_fps_counter(container);
-
-	// draw the profiler if visible
-	if (show_profiler())
-		draw_profiler(container);
 
 	// if we're single-stepping, pause now
 	if (single_step())

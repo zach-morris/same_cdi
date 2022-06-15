@@ -174,8 +174,6 @@ files {
 	MAME_DIR .. "src/emu/network.h",
 	MAME_DIR .. "src/emu/parameters.cpp",
 	MAME_DIR .. "src/emu/parameters.h",
-	MAME_DIR .. "src/emu/profiler.cpp",
-	MAME_DIR .. "src/emu/profiler.h",
 	MAME_DIR .. "src/emu/output.cpp",
 	MAME_DIR .. "src/emu/output.h",
 	MAME_DIR .. "src/emu/recording.cpp",

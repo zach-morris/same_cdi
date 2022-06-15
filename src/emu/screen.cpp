@@ -20,16 +20,6 @@
 
 #include <set>
 
-
-//**************************************************************************
-//  DEBUGGING
-//**************************************************************************
-
-#define VERBOSE                     (0)
-#define LOG_PARTIAL_UPDATES(x)      do { if (VERBOSE) logerror x; } while (0)
-
-
-
 //**************************************************************************
 //  GLOBAL VARIABLES
 //**************************************************************************
@@ -1156,32 +1146,21 @@ void screen_device::set_visible_area(int min_x, int max_x, int min_y, int max_y)
 
 bool screen_device::update_partial(int scanline)
 {
-	LOG_PARTIAL_UPDATES(("Partial: update_partial(%s, %d): ", tag(), scanline));
-
 	// these two checks only apply if we're allowed to skip frames
 	if (!(m_video_attributes & VIDEO_ALWAYS_UPDATE))
 	{
 		// if skipping this frame, bail
 		if (machine().video().skip_this_frame())
-		{
-			LOG_PARTIAL_UPDATES(("skipped due to frameskipping\n"));
 			return false;
-		}
 
 		// skip if this screen is not visible anywhere
 		if (!machine().render().is_live(*this))
-		{
-			LOG_PARTIAL_UPDATES(("skipped because screen not live\n"));
 			return false;
-		}
 	}
 
 	// skip if we already rendered this line
 	if (scanline < m_last_partial_scan)
-	{
-		LOG_PARTIAL_UPDATES(("skipped because line was already rendered\n"));
 		return false;
-	}
 
 	// set the range of scanlines to render
 	rectangle clip(m_visarea);
@@ -1189,15 +1168,9 @@ bool screen_device::update_partial(int scanline)
 
 	// skip if entirely outside of visible area
 	if (clip.top() > clip.bottom())
-	{
-		LOG_PARTIAL_UPDATES(("skipped because outside of visible area\n"));
 		return false;
-	}
 
 	// otherwise, render
-	LOG_PARTIAL_UPDATES(("updating %d-%d\n", clip.top(), clip.bottom()));
-	g_profiler.start(PROFILER_VIDEO);
-
 	u32 flags = 0;
 	if (m_video_attributes & VIDEO_VARIABLE_WIDTH)
 	{
@@ -1237,8 +1210,6 @@ bool screen_device::update_partial(int scanline)
 		m_partial_updates_this_frame++;
 	}
 
-	g_profiler.stop();
-
 	// if we modified the bitmap, we have to commit
 	m_changed |= ~flags & UPDATE_HAS_NOT_CHANGED;
 
@@ -1261,17 +1232,11 @@ void screen_device::update_now()
 	{
 		// if skipping this frame, bail
 		if (machine().video().skip_this_frame())
-		{
-			LOG_PARTIAL_UPDATES(("skipped due to frameskipping\n"));
 			return;
-		}
 
 		// skip if this screen is not visible anywhere
 		if (!machine().render().is_live(*this))
-		{
-			LOG_PARTIAL_UPDATES(("skipped because screen not live\n"));
 			return;
-		}
 	}
 
 	int current_vpos = vpos();
@@ -1280,19 +1245,11 @@ void screen_device::update_now()
 
 	// skip if we already rendered this line
 	if (current_vpos < m_last_partial_scan)
-	{
-		LOG_PARTIAL_UPDATES(("skipped because line was already rendered\n"));
 		return;
-	}
 
 	// if beam position is the same, there's nothing to update
 	if (current_vpos == m_last_partial_scan && current_hpos == m_partial_scan_hpos)
-	{
-		LOG_PARTIAL_UPDATES(("skipped because beam position is unchanged\n"));
 		return;
-	}
-
-	LOG_PARTIAL_UPDATES(("update_now(): Y=%d, X=%d, last partial %d, partial hpos %d  (vis %d %d)\n", current_vpos, current_hpos, m_last_partial_scan, m_partial_scan_hpos, m_visarea.right(), m_visarea.bottom()));
 
 	// start off by doing a partial update up to the line before us, in case that was necessary
 	if (current_vpos > m_last_partial_scan)
@@ -1309,8 +1266,6 @@ void screen_device::update_now()
 			// if there's something to draw, do it
 			if (!clip.empty())
 			{
-				g_profiler.start(PROFILER_VIDEO);
-
 				u32 flags = 0;
 				screen_bitmap &curbitmap = m_bitmap[m_curbitmap];
 				if (m_video_attributes & VIDEO_VARIABLE_WIDTH)
@@ -1333,7 +1288,6 @@ void screen_device::update_now()
 					}
 				}
 
-				g_profiler.stop();
 				m_partial_updates_this_frame++;
 
 				// if we modified the bitmap, we have to commit
@@ -1360,10 +1314,6 @@ void screen_device::update_now()
 	// and if there's something to draw, do it
 	if (!clip.empty())
 	{
-		g_profiler.start(PROFILER_VIDEO);
-
-		LOG_PARTIAL_UPDATES(("doing scanline partial draw: Y %d X %d-%d\n", clip.bottom(), clip.left(), clip.right()));
-
 		u32 flags = 0;
 		screen_bitmap &curbitmap = m_bitmap[m_curbitmap];
 		if (m_video_attributes & VIDEO_VARIABLE_WIDTH)
@@ -1387,7 +1337,6 @@ void screen_device::update_now()
 		}
 
 		m_partial_updates_this_frame++;
-		g_profiler.stop();
 
 		// if we modified the bitmap, we have to commit
 		m_changed |= ~flags & UPDATE_HAS_NOT_CHANGED;

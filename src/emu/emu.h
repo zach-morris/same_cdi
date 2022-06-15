@@ -32,7 +32,6 @@
 #include "eminline.h"
 #include "xtal.h"
 #include "attotime.h"
-#include "profiler.h"
 
 // http interface helpers
 #include "http.h"
