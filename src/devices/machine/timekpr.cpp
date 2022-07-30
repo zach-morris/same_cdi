@@ -18,10 +18,6 @@
 #include "machine/timekpr.h"
 #include "machine/timehelp.h"
 
-#define LOG_GENERAL (1U << 0)
-#define LOG_TICKS   (1U << 1)
-
-#define VERBOSE (0)
 #include "logmacro.h"
 
 // device type definition
@@ -270,7 +266,6 @@ void timekeeper_device::counters_from_ram()
 
 void timekeeper_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
 {
-	LOGMASKED(LOG_TICKS, "Tick\n");
 	if ((m_seconds & SECONDS_ST) != 0 ||
 		(m_control & CONTROL_W) != 0)
 	{
@@ -366,7 +361,6 @@ void timekeeper_device::watchdog_write(u8 data)
 
 void timekeeper_device::write(offs_t offset, u8 data)
 {
-	LOGMASKED(LOG_GENERAL, "timekeeper_device::write: %04x = %02x\n", offset, data);
 	if (offset == m_offset_control)
 	{
 		if ((m_control & CONTROL_W) != 0 &&
@@ -426,7 +420,6 @@ u8 timekeeper_device::read(offs_t offset)
 		m_reset_cb(CLEAR_LINE);
 		m_irq_cb(CLEAR_LINE);
 	}
-	LOGMASKED(LOG_GENERAL, "timekeeper_device::read: %04x (%02x)\n", offset, result);
 	return result;
 }
 

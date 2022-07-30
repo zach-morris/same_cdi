@@ -49,13 +49,10 @@ void device_sdlc_consumer_interface::interface_post_start()
 
 void device_sdlc_consumer_interface::rx_bit(bool state)
 {
-	LOGRXBIT("Received bit %u\n", state ? 1U : 0U);
-
 	m_shift_register = (m_shift_register >> 1) | (state ? 0x8000U : 0x0000U);
 	if (!state && !m_line_active)
 	{
 		// any zero bit means the line has become active
-		LOGLINESTATE("Line became active\n");
 		m_line_active = 1U;
 		line_active();
 	}
@@ -63,10 +60,8 @@ void device_sdlc_consumer_interface::rx_bit(bool state)
 	if ((m_shift_register & 0xff00U) == 0x7e00U)
 	{
 		// a flag opens and closes frames
-		LOGRXFLAG("Received flag\n");
 		if (m_in_frame)
 		{
-			LOGFRAMING("End of frame\n");
 			m_in_frame = 0U;
 			frame_end();
 		}
@@ -78,7 +73,6 @@ void device_sdlc_consumer_interface::rx_bit(bool state)
 		// fifteen consecutive ones is an inactive line condition
 		if (m_line_active)
 		{
-			LOGLINESTATE("Line became inactive\n");
 			m_line_active = 0U;
 			line_inactive();
 		}
@@ -88,7 +82,6 @@ void device_sdlc_consumer_interface::rx_bit(bool state)
 		// seven consecutive ones is a frame abort
 		if (m_in_frame || m_discard_bits)
 		{
-			LOGFRAMING("Received frame abort\n");
 			m_in_frame = 0U;
 			m_discard_bits = 0U;
 			frame_abort();
@@ -99,7 +92,6 @@ void device_sdlc_consumer_interface::rx_bit(bool state)
 		// discard the flag as it shifts off
 		if (m_discard_bits && !--m_discard_bits)
 		{
-			LOGFRAMING("Start of frame\n");
 			m_in_frame = 1U;
 			frame_start();
 		}
@@ -116,8 +108,6 @@ void device_sdlc_consumer_interface::rx_bit(bool state)
 
 void device_sdlc_consumer_interface::rx_reset()
 {
-	LOG("Receive reset\n");
-
 	m_line_active = 0U;
 	m_in_frame = 0U;
 	m_discard_bits = 0U;
@@ -148,7 +138,6 @@ WRITE_LINE_MEMBER(sdlc_logger_device::clock_w)
 		if (m_current_clock == m_clock_active)
 		{
 			bool const bit(m_data_nrzi ? (m_current_data == m_last_data) : m_current_data);
-			LOGRXBIT("Received bit: %u (%u -> %u)\n", bit ? 1U : 0U, m_last_data, m_current_data);
 			m_last_data = m_current_data;
 			rx_bit(bit);
 		}

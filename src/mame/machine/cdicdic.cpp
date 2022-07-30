@@ -583,10 +583,7 @@ void cdicdic_device::play_cdda_sector(const uint8_t *data)
 void cdicdic_device::play_audio_sector(const uint8_t coding, const uint8_t *data)
 {
 	if ((coding & CODING_CHAN_MASK) > CODING_STEREO || (coding & CODING_BPS_MASK) == CODING_BPS_MPEG || (coding & CODING_RATE_MASK) == CODING_RATE_RESV)
-	{
-		LOGMASKED(LOG_SECTORS, "Invalid coding (%02x), ignoring\n", coding);
 		return;
-	}
 
 	int channels = 2;
 	//offs_t buffer_length = 1;
@@ -629,8 +626,6 @@ void cdicdic_device::play_audio_sector(const uint8_t coding, const uint8_t *data
 		break;
 	}
 
-	LOGMASKED(LOG_SECTORS, "Coding %02x, %d channels, %d bits, %08x frequency\n", coding, channels, bits, sample_frequency);
-
 	m_dmadac[0]->set_frequency(sample_frequency);
 	m_dmadac[1]->set_frequency(sample_frequency);
 	m_dmadac[0]->set_volume(0x100);
@@ -658,11 +653,7 @@ TIMER_CALLBACK_MEMBER( cdicdic_device::audio_tick )
 	{
 		m_audio_sector_counter--;
 		if (m_audio_sector_counter > 0)
-		{
-			LOGMASKED(LOG_SAMPLES, "Audio sector counter %d, deducting and skipping\n", m_audio_sector_counter);
 			return;
-		}
-		LOGMASKED(LOG_SAMPLES, "Audio sector counter now 0, deducting and playing\n");
 	}
 
 	if (m_decoding_audio_map)
@@ -681,15 +672,12 @@ void cdicdic_device::process_audio_map()
 		return;
 	}
 
-	LOGMASKED(LOG_SAMPLES, "Procesing audio map from %04x\n", m_decode_addr);
-
 	uint8_t *ram = &m_ram[m_decode_addr & 0x3ffe];
 	m_decode_addr ^= 0x1a00;
 
 	const bool was_decoding = (m_audio_format_sectors != 0);
 
 	const uint8_t coding = ram[(SECTOR_CODING2 - SECTOR_HEADER) ^ 1];
-	LOGMASKED(LOG_SAMPLES, "Coding is %02x\n", coding);
 	if (coding != 0xff)
 	{
 		m_decoding_audio_map = true;
@@ -720,8 +708,6 @@ void cdicdic_device::process_audio_map()
 void cdicdic_device::update_interrupt_state()
 {
 	const bool interrupt_active = (bool)BIT(m_x_buffer | m_audio_buffer, 15);
-	if (!interrupt_active)
-		LOGMASKED(LOG_SECTORS, "%s: Clearing CDIC interrupt line\n", machine().describe_context());
 	m_intreq_callback(interrupt_active ? ASSERT_LINE : CLEAR_LINE);
 }
 
@@ -745,39 +731,21 @@ bool cdicdic_device::is_valid_sector(const uint8_t *buffer)
 
 	// Verify MSF
 	if (mins_bcd != buffer[SECTOR_MINUTES] || secs_bcd != buffer[SECTOR_SECONDS] || frac_bcd != buffer[SECTOR_FRACS])
-	{
-		LOGMASKED(LOG_SECTORS, "Not valid sector, MSF (%02x:%02x:%02x vs. %02x:%02x:%02x\n", mins_bcd, secs_bcd, frac_bcd, buffer[SECTOR_MINUTES], buffer[SECTOR_SECONDS], buffer[SECTOR_FRACS]);
 		return false;
-	}
 
 	// Verify mode
 	if (buffer[SECTOR_MODE] != 1 && buffer[SECTOR_MODE] != 2)
-	{
-		LOGMASKED(LOG_SECTORS, "Not valid sector, mode %02x\n", buffer[SECTOR_MODE]);
 		return false;
-	}
 
 	// Verify duplicate info
 	if (buffer[SECTOR_FILE1] != buffer[SECTOR_FILE2])
-	{
-		LOGMASKED(LOG_SECTORS, "Not valid sector, file %02x vs. %02x\n", buffer[SECTOR_FILE1], buffer[SECTOR_FILE2]);
 		return false;
-	}
 	if (buffer[SECTOR_CHAN1] != buffer[SECTOR_CHAN2])
-	{
-		LOGMASKED(LOG_SECTORS, "Not valid sector, channel %02x vs. %02x\n", buffer[SECTOR_CHAN1], buffer[SECTOR_CHAN2]);
 		return false;
-	}
 	if (buffer[SECTOR_SUBMODE1] != buffer[SECTOR_SUBMODE2])
-	{
-		LOGMASKED(LOG_SECTORS, "Not valid sector, channel %02x vs. %02x\n", buffer[SECTOR_SUBMODE1], buffer[SECTOR_SUBMODE2]);
 		return false;
-	}
 	if (buffer[SECTOR_CODING1] != buffer[SECTOR_CODING2])
-	{
-		LOGMASKED(LOG_SECTORS, "Not valid sector, coding %02x vs. %02x\n", buffer[SECTOR_CODING1], buffer[SECTOR_CODING2]);
 		return false;
-	}
 
 	return true;
 }
@@ -785,35 +753,21 @@ bool cdicdic_device::is_valid_sector(const uint8_t *buffer)
 bool cdicdic_device::is_mode2_sector_selected(const uint8_t *buffer)
 {
 	if ((buffer[SECTOR_FILE2] << 8) != m_file)
-	{
-		LOGMASKED(LOG_SECTORS, "Mode 2 sector is not selected, current file: %04x, disc file: %04x\n", m_file, buffer[SECTOR_FILE2]);
 		return false;
-	}
 
 	if (buffer[SECTOR_SUBMODE2] & SUBMODE_EOF)
-	{
-		LOGMASKED(LOG_SECTORS, "Mode 2 sector is EOF, queueing end of read\n");
 		m_disc_command = 0;
-	}
 
 	// End-of-File, End-of-Record, or Trigger sectors skip selection beyond initial file selection.
 	if (buffer[SECTOR_SUBMODE2] & (SUBMODE_EOF | SUBMODE_TRIG | SUBMODE_EOR))
-	{
-		LOGMASKED(LOG_SECTORS, "Mode 2 sector is selected due to EOF, TRIG, or EOR (%02x)\n", buffer[SECTOR_SUBMODE2]);
 		return true;
-	}
 
 	// Sectors with no applicable data are skipped.
 	if (!(buffer[SECTOR_SUBMODE2] & (SUBMODE_DATA | SUBMODE_AUDIO | SUBMODE_VIDEO)))
-	{
-		LOGMASKED(LOG_SECTORS, "Mode 2 sector is not selected due to being a message sector (%02x)\n", buffer[SECTOR_SUBMODE2]);
 		return false;
-	}
 
 	// Select based on the specified channel mask.
 	const bool channel_selected = (bool)BIT(m_channel, buffer[SECTOR_CHAN2]);
-
-	LOGMASKED(LOG_SECTORS, "Mode 2 sector is %sselected due to channel (register %04x, buffer channel %04x)\n", channel_selected ? "" : "not ", m_channel, buffer[SECTOR_CHAN2]);
 
 	return channel_selected;
 }
@@ -822,15 +776,10 @@ bool cdicdic_device::is_mode2_audio_selected(const uint8_t *buffer)
 {
 	// Non-Mode-2, Non-Audio sectors are never selected for audio playback.
 	if (!(buffer[SECTOR_SUBMODE2] & SUBMODE_FORM) || !(buffer[SECTOR_SUBMODE2] & SUBMODE_AUDIO))
-	{
-		LOGMASKED(LOG_SECTORS, "Audio is not selected; submode %02x\n", buffer[SECTOR_SUBMODE2]);
 		return false;
-	}
 
 	// Select based on the specified audio channel mask.
 	const bool channel_selected = (bool)BIT(m_audio_channel, buffer[SECTOR_CHAN2]);
-
-	LOGMASKED(LOG_SECTORS, "Mode 2 audio is %sselected due to channel (register %04x, buffer channel %04x)\n", channel_selected ? "" : "not ", m_audio_channel, buffer[SECTOR_CHAN2]);
 
 	return channel_selected;
 }
@@ -844,18 +793,14 @@ TIMER_CALLBACK_MEMBER( cdicdic_device::sector_tick )
 
 	if (m_disc_spinup_counter != 0)
 	{
-		LOGMASKED(LOG_SECTORS, "Sector tick, waiting on spinup\n");
 		m_disc_spinup_counter--;
 		return;
 	}
-
-	LOGMASKED(LOG_SECTORS, "About to process a disc sector\n");
 
 	process_disc_sector();
 
 	if (m_disc_command == 0)
 	{
-		LOGMASKED(LOG_SECTORS, "Disc command has been reset after processing; stopping processing.\n");
 		cancel_disc_read();
 		return;
 	}
@@ -928,15 +873,12 @@ void cdicdic_device::process_disc_sector()
 	const uint8_t secs_bcd = ((secs / 10) << 4) | (secs % 10);
 	const uint8_t frac_bcd = ((frac / 10) << 4) | (frac % 10);
 
-	LOGMASKED(LOG_SECTORS, "Disc sector, current LBA: %08x, MSF: %02x %02x %02x\n", real_lba, mins_bcd, secs_bcd, frac_bcd);
-
 	uint8_t buffer[2560] = { 0 };
 	cdrom_read_data(m_cd, m_curr_lba, buffer, CD_TRACK_RAW_DONTCARE);
 
 	// Detect (badly) if we're dealing with a byteswapped loose-bin image
 	if (buffer[0] == 0xff && buffer[1] == 0x00)
 	{
-		LOGMASKED(LOG_SECTORS, "Byteswapping\n");
 		m_cd_byteswap = true;
 	}
 
@@ -952,36 +894,21 @@ void cdicdic_device::process_disc_sector()
 	{
 		uint8_t descramble_buffer[2560];
 		memcpy(descramble_buffer, buffer, sizeof(descramble_buffer));
-		LOGMASKED(LOG_SECTORS, "Sector seems to be encoded, attempting to apply descrambling\n");
 		descramble_sector(descramble_buffer);
 
-		if (!is_valid_sector(descramble_buffer))
-		{
-			LOGMASKED(LOG_SECTORS, "Sector remains invalid after descrambling, giving up and proceeding as normal\n");
-		}
-		else
-		{
+		if (is_valid_sector(descramble_buffer))
 			memcpy(buffer, descramble_buffer, sizeof(descramble_buffer));
-		}
 	}
-
-	LOGMASKED(LOG_SECTORS, "Sector header data: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		buffer[ 0], buffer[ 1], buffer[ 2], buffer[ 3], buffer[ 4], buffer[ 5], buffer[ 6], buffer[ 7], buffer[ 8], buffer[ 9],
-		buffer[10], buffer[11], buffer[12], buffer[13], buffer[14], buffer[15], buffer[16], buffer[17], buffer[18], buffer[19],
-		buffer[20], buffer[21], buffer[22], buffer[23]);
 
 	if (buffer[SECTOR_MODE] == 2 && m_disc_mode == DISC_MODE2)
 	{
 		// First, filter whether we want to process this sector at all.
 		if (!is_mode2_sector_selected(buffer))
-		{
 			return;
-		}
 
 		// Next, determine if we want to process this sector as an audio sector.
 		if (is_mode2_audio_selected(buffer))
 		{
-			LOGMASKED(LOG_SECTORS, "Audio is selected\n");
 			m_audio_sector_counter = get_sector_count_for_coding(buffer[SECTOR_CODING2]);
 			m_decoding_audio_map = false;
 
@@ -1189,37 +1116,29 @@ uint16_t cdicdic_device::regs_r(offs_t offset, uint16_t mem_mask)
 	switch (addr)
 	{
 		case 0x3c00/2: // Command register
-			LOGMASKED(LOG_READS, "%s: cdic_r: Command Register = %04x & %04x\n", machine().describe_context(), m_command, mem_mask);
 			return m_command;
 
 		case 0x3c02/2: // Time register (MSW)
-			LOGMASKED(LOG_READS, "%s: cdic_r: Time Register (MSW) = %04x & %04x\n", machine().describe_context(), m_time >> 16, mem_mask);
 			return m_time >> 16;
 
 		case 0x3c04/2: // Time register (LSW)
-			LOGMASKED(LOG_READS, "%s: cdic_r: Time Register (LSW) = %04x & %04x\n", machine().describe_context(), (uint16_t)(m_time & 0x0000ffff), mem_mask);
 			return m_time & 0x0000ffff;
 
 		case 0x3c06/2: // File register
-			LOGMASKED(LOG_READS, "%s: cdic_r: File Register = %04x & %04x\n", machine().describe_context(), m_file, mem_mask);
 			return m_file;
 
 		case 0x3c08/2: // Channel register (MSW)
-			LOGMASKED(LOG_READS, "%s: cdic_r: Channel Register (MSW) = %04x & %04x\n", machine().describe_context(), m_channel >> 16, mem_mask);
 			return m_channel >> 16;
 
 		case 0x3c0a/2: // Channel register (LSW)
-			LOGMASKED(LOG_READS, "%s: cdic_r: Channel Register (LSW) = %04x & %04x\n", machine().describe_context(), m_channel & 0x0000ffff, mem_mask);
 			return m_channel & 0x0000ffff;
 
 		case 0x3c0c/2: // Audio Channel register
-			LOGMASKED(LOG_READS, "%s: cdic_r: Audio Channel Register = %04x & %04x\n", machine().describe_context(), m_audio_channel, mem_mask);
 			return m_audio_channel;
 
 		case 0x3ff4/2: // ABUF
 		{
 			uint16_t temp = m_audio_buffer;
-			LOGMASKED(LOG_READS, "%s: cdic_r: Audio Buffer Register = %04x & %04x\n", machine().describe_context(), temp, mem_mask);
 			m_audio_buffer &= 0x7fff;
 			update_interrupt_state();
 			return temp;
@@ -1228,7 +1147,6 @@ uint16_t cdicdic_device::regs_r(offs_t offset, uint16_t mem_mask)
 		case 0x3ff6/2: // XBUF
 		{
 			uint16_t temp = m_x_buffer;
-			LOGMASKED(LOG_READS, "%s: cdic_r: X-Buffer Register = %04x & %04x\n", machine().describe_context(), temp, mem_mask);
 			m_x_buffer &= 0x7fff;
 			update_interrupt_state();
 			return temp;
@@ -1237,17 +1155,16 @@ uint16_t cdicdic_device::regs_r(offs_t offset, uint16_t mem_mask)
 		case 0x3ffa/2: // AUDCTL
 			if (!m_decoding_audio_map)
 				m_z_buffer ^= 0x0001;
-			LOGMASKED(LOG_READS, "%s: cdic_r: Z-Buffer Register Read: %04x & %04x\n", machine().describe_context(), m_z_buffer, mem_mask);
 			return m_z_buffer;
 
 		case 0x3ffe/2:
-			LOGMASKED(LOG_READS, "%s: cdic_r: Data buffer Register = %04x & %04x\n", machine().describe_context(), m_data_buffer, mem_mask);
 			return m_data_buffer;
 
 		default:
-			LOGMASKED(LOG_READS | LOG_UNKNOWNS, "%s: cdic_r: Unknown address: %04x & %04x\n", machine().describe_context(), addr*2, mem_mask);
-			return 0;
+			break;
 	}
+
+	return 0;
 }
 
 void cdicdic_device::regs_w(offs_t offset, uint16_t data, uint16_t mem_mask)
@@ -1257,20 +1174,17 @@ void cdicdic_device::regs_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 	switch (addr)
 	{
 		case 0x3c00/2: // Command register
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: Command Register = %04x & %04x\n", machine().describe_context(), data, mem_mask);
 			COMBINE_DATA(&m_command);
 			break;
 
 		case 0x3c02/2: // Time register (MSW)
 			m_time &= ~(mem_mask << 16);
 			m_time |= (data & mem_mask) << 16;
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: Time Register (MSW) = %04x & %04x\n", machine().describe_context(), data, mem_mask);
 			break;
 
 		case 0x3c04/2: // Time register (LSW)
 			m_time &= ~mem_mask;
 			m_time |= data & mem_mask;
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: Time Register (LSW) = %04x & %04x\n", machine().describe_context(), data, mem_mask);
 			break;
 
 		case 0x3c06/2: // File register
@@ -1311,9 +1225,6 @@ void cdicdic_device::regs_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 			uint32_t count = m_scc->dma().channel[0].transfer_counter;
 			uint32_t device_index = (data & 0x3fff) >> 1;
 			uint16_t *ram = (uint16_t *)m_ram.get();
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: DMA Control Register = %04x & %04x\n", machine().describe_context(), data, mem_mask);
-			LOGMASKED(LOG_WRITES, "%s: Memory address counter: %08x\n", machine().describe_context(), m_scc->dma().channel[0].memory_address_counter);
-			LOGMASKED(LOG_WRITES, "%s: Doing copy, transferring %04x bytes %s\n", machine().describe_context(), count * 2, (m_scc->dma().channel[0].operation_control & OCR_D) ? "to main RAM" : "to device RAM");
 			for (uint32_t index = start / 2; index < (start / 2 + count); index++)
 			{
 				if (m_scc->dma().channel[0].operation_control & OCR_D)
@@ -1330,7 +1241,6 @@ void cdicdic_device::regs_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 		}
 
 		case 0x3ffa/2:
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: Z-Buffer Register Write: %04x & %04x\n", machine().describe_context(), data, mem_mask);
 			COMBINE_DATA(&m_z_buffer);
 			if (!(m_z_buffer & 0x2000))
 			{
@@ -1347,18 +1257,13 @@ void cdicdic_device::regs_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 			break;
 
 		case 0x3ffc/2:
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: Interrupt Vector Register = %04x & %04x\n", machine().describe_context(), data, mem_mask);
 			COMBINE_DATA(&m_interrupt_vector);
 			break;
 
 		case 0x3ffe/2:
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: Data Buffer Register = %04x & %04x\n", machine().describe_context(), data, mem_mask);
 			COMBINE_DATA(&m_data_buffer);
 			if (m_data_buffer & 0x8000)
-			{
-				LOGMASKED(LOG_WRITES, "%s: cdic_w: Data Buffer high-bit set, beginning command processing\n", machine().describe_context());
 				handle_cdic_command();
-			}
 			if (!(m_data_buffer & 0x4000))
 			{
 				m_disc_command = 0;
@@ -1369,7 +1274,6 @@ void cdicdic_device::regs_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 			break;
 
 		default:
-			LOGMASKED(LOG_WRITES | LOG_UNKNOWNS, "%s: cdic_w: Unknown address: %04x = %04x & %04x\n", machine().describe_context(), addr*2, data, mem_mask);
 			break;
 	}
 }
@@ -1395,21 +1299,17 @@ void cdicdic_device::handle_cdic_command()
 	switch (m_command)
 	{
 		case 0x23: // Reset Mode 1
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: Reset Mode 1 command\n", machine().describe_context());
 			if (m_disc_command == 0)
 				init_disc_read(DISC_MODE1);
 			break;
 		case 0x24: // Reset Mode 2
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: Reset Mode 2 command\n", machine().describe_context());
 			if (m_disc_command == 0)
 				init_disc_read(DISC_MODE1);
 			break;
 		case 0x2b: // Stop CDDA
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: Stop CDDA command\n", machine().describe_context());
 			cancel_disc_read();
 			break;
 		case 0x2e: // Update
-			LOGMASKED(LOG_WRITES, "%s: cdic_w: Update command\n", machine().describe_context());
 			break;
 		case 0x27: // Fetch TOC
 			init_disc_read(DISC_TOC);
@@ -1588,14 +1488,12 @@ void cdicdic_device::device_reset()
 
 void cdicdic_device::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
-	LOGMASKED(LOG_RAM, "%s: ram_w: %04x = %04x & %04x\n", machine().describe_context(), offset << 1, data, mem_mask);
 	COMBINE_DATA((uint16_t *)&m_ram[offset << 1]);
 }
 
 uint16_t cdicdic_device::ram_r(offs_t offset, uint16_t mem_mask)
 {
 	const uint16_t data = ((uint16_t)m_ram[(offset << 1) + 1] << 8) | m_ram[offset << 1];
-	LOGMASKED(LOG_RAM, "%s: ram_r: %04x : %04x & %04x\n", machine().describe_context(), offset << 1, data, mem_mask);
 	return data;
 }
 

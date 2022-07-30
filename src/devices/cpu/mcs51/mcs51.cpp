@@ -137,8 +137,6 @@
 
 #define VERBOSE 0
 
-#define LOG(x)  do { if (VERBOSE) logerror x; } while (0)
-
 /***************************************************************************
     CONSTANTS
 ***************************************************************************/
@@ -792,7 +790,6 @@ void mcs51_cpu_device::clear_current_irq()
 		m_cur_irq_prio = 0;
 	else
 		m_cur_irq_prio = -1;
-	LOG(("New: %d %02x\n", m_cur_irq_prio, m_irq_active));
 }
 
 uint8_t mcs51_cpu_device::r_acc() { return SFR_A(ADDR_ACC); }
@@ -1053,7 +1050,6 @@ void mcs51_cpu_device::transmit_receive(int source)
 				int data = 0;
 				//Call our callball function to retrieve the data
 				data = m_serial_rx_cb(0, 0xff);
-				LOG(("RX Deliver %d\n", data));
 				SET_SBUF(data);
 				//Flag the IRQ
 				SET_RI(1);
@@ -1329,7 +1325,6 @@ void mcs51_cpu_device::serial_transmit(uint8_t data)
 
 	//Flag that we're sending data
 	m_uart.data_out = data;
-	LOG(("serial_transmit: %x %x\n", mode, data));
 	switch(mode) {
 		//8 bit shifter ( + start,stop bit ) - baud set by clock freq / 12
 		case 0:
@@ -1814,12 +1809,8 @@ void mcs51_cpu_device::check_irqs()
 	/* Skip the interrupt request if currently processing interrupt
 	 * and the new request does not have a higher priority
 	 */
-	LOG(("Request: %d\n", priority_request));
 	if (m_irq_active && (priority_request <= m_cur_irq_prio))
-	{
-		LOG(("higher or equal priority irq (%u) in progress already, skipping ...\n", m_cur_irq_prio));
 		return;
-	}
 
 	// Hack to work around polling latency issue with JB INT0/INT1
 	if (m_last_op == 0x20 && ((int_vec == V_IE0 && m_last_bit == 0xb2) || (int_vec == V_IE1 && m_last_bit == 0xb3)))
@@ -1835,8 +1826,6 @@ void mcs51_cpu_device::check_irqs()
 	//Set current Irq & Priority being serviced
 	m_cur_irq_prio = priority_request;
 	m_irq_active |= (1 << priority_request);
-
-	LOG(("Take: %d %02x\n", m_cur_irq_prio, m_irq_active));
 
 	//Clear any interrupt flags that should be cleared since we're servicing the irq!
 	switch(int_vec) {
@@ -2110,7 +2099,6 @@ void mcs51_cpu_device::sfr_write(size_t offset, uint8_t data)
 		case ADDR_SCON:
 			break;
 		default:
-			LOG(("mcs51 '%s': attemping to write to an invalid/non-implemented SFR address: %x at 0x%04x, data=%x\n", tag(), (uint32_t)offset,PC,data));
 			/* no write in this case according to manual */
 			return;
 	}
@@ -2152,7 +2140,6 @@ uint8_t mcs51_cpu_device::sfr_read(size_t offset)
 			return m_data.read_byte((size_t) offset | 0x100);
 		/* Illegal or non-implemented sfr */
 		default:
-			LOG(("mcs51 '%s': attemping to read an invalid/non-implemented SFR address: %x at 0x%04x\n", tag(), (uint32_t)offset,PC));
 			/* according to the manual, the read may return random bits */
 			return 0xff;
 	}
@@ -2431,9 +2418,6 @@ uint8_t i80c52_device::sfr_read(size_t offset)
  ****************************************************************************/
 
 
-#define DS5_LOGW(a, d)  LOG(("ds5002fp '%s': write to  " # a " register at 0x%04x, data=%x\n", tag(), PC, d))
-#define DS5_LOGR(a, d)  LOG(("ds5002fp '%s': read from " # a " register at 0x%04x\n", tag(), PC))
-
 uint8_t mcs51_cpu_device::ds5002fp_protected(size_t offset, uint8_t data, uint8_t ta_mask, uint8_t mask)
 {
 	uint8_t is_timed_access;
@@ -2457,18 +2441,17 @@ void ds5002fp_device::sfr_write(size_t offset, uint8_t data)
 			if ((data == 0xaa) && (m_ds5002fp.ta_window == 0))
 			{
 				m_ds5002fp.ta_window = 6; /* 4*12 + 2*12 */
-				LOG(("ds5002fp '%s': TA window initiated at 0x%04x\n", tag(), PC));
 			}
 			break;
-		case ADDR_MCON:     data = ds5002fp_protected(ADDR_MCON, data, 0x0f, 0xf7);    DS5_LOGW(MCON, data); break;
-		case ADDR_RPCTL:    data = ds5002fp_protected(ADDR_RPCTL, data, 0xef, 0xfe); DS5_LOGW(RPCTL, data); break;
-		case ADDR_CRCR:     data = ds5002fp_protected(ADDR_CRCR, data, 0xff, 0x0f);    DS5_LOGW(CRCR, data);   break;
+		case ADDR_MCON:     data = ds5002fp_protected(ADDR_MCON, data, 0x0f, 0xf7);    break;
+		case ADDR_RPCTL:    data = ds5002fp_protected(ADDR_RPCTL, data, 0xef, 0xfe); break;
+		case ADDR_CRCR:     data = ds5002fp_protected(ADDR_CRCR, data, 0xff, 0x0f);    break;
 		case ADDR_PCON:     data = ds5002fp_protected(ADDR_PCON, data, 0xb9, 0xff); break;
 		case ADDR_IP:       data = ds5002fp_protected(ADDR_IP, data, 0x7f, 0xff);  break;
-		case ADDR_CRCL:     DS5_LOGW(CRCL, data);                                   break;
-		case ADDR_CRCH:     DS5_LOGW(CRCH, data);                                   break;
-		case ADDR_RNR:      DS5_LOGW(RNR, data);                                    break;
-		case ADDR_RPS:      DS5_LOGW(RPS, data);                                    break;
+		case ADDR_CRCL:     break;
+		case ADDR_CRCH:     break;
+		case ADDR_RNR:      break;
+		case ADDR_RPS:      break;
 		default:
 			mcs51_cpu_device::sfr_write(offset, data);
 			return;
@@ -2500,16 +2483,16 @@ uint8_t ds5002fp_device::sfr_read(size_t offset)
 {
 	switch (offset)
 	{
-		case ADDR_CRCR:     DS5_LOGR(CRCR, data);       break;
-		case ADDR_CRCL:     DS5_LOGR(CRCL, data);       break;
-		case ADDR_CRCH:     DS5_LOGR(CRCH, data);       break;
-		case ADDR_MCON:     DS5_LOGR(MCON, data);       break;
-		case ADDR_TA:       DS5_LOGR(TA, data);         break;
-		case ADDR_RNR:      DS5_LOGR(RNR, data);
+		case ADDR_CRCR:     break;
+		case ADDR_CRCL:     break;
+		case ADDR_CRCH:     break;
+		case ADDR_MCON:     break;
+		case ADDR_TA:       break;
+		case ADDR_RNR: 
 			return handle_rnr();
-		case ADDR_RPCTL:    DS5_LOGR(RPCTL, data);  /* touchgo stalls unless bit 7 is set, RNR status (Random Number status) */
+		case ADDR_RPCTL:    /* touchgo stalls unless bit 7 is set, RNR status (Random Number status) */
 			return (is_rnr_ready() ? 0x80 : 0x00);  /* falling through to sfr_read for the remaining bits stops high score data loading? */
-		case ADDR_RPS:      DS5_LOGR(RPS, data);        break;
+		case ADDR_RPS:      break;
 		case ADDR_PCON:
 			SET_PFW(0);     /* reset PFW flag */
 			return mcs51_cpu_device::sfr_read(offset);

@@ -241,18 +241,12 @@ m68705_device::m68705_device(machine_config const &mconfig, char const *tag, dev
 
 template <offs_t B> u8 m68705_device::eprom_r(offs_t offset)
 {
-	if (pcr_vpon() && !pcr_ple())
-		LOGEPROM("read EPROM %04X prevented when Vpp high and /PLE = 0\n", B + offset);
-
 	// read locked out when /VPON and /PLE are asserted
 	return (!pcr_vpon() || !pcr_ple()) ? m_user_rom[B + offset] : 0xff;
 }
 
 template <offs_t B> void m68705_device::eprom_w(offs_t offset, u8 data)
 {
-	LOGEPROM("EPROM programming latch write%s%s: %04X = %02X\n",
-			!pcr_vpon() ? " [Vpp low]" : "", !pcr_ple() ? " [disabled]" : "", B + offset, data);
-
 	// programming latch enabled when /VPON and /PLE are asserted
 	if (pcr_vpon() && pcr_ple())
 	{
@@ -286,11 +280,6 @@ template <std::size_t N> u8 m6805_hmos_device::port_r()
 	if (!m_port_cb_r[N].isnull())
 	{
 		u8 const newval(m_port_cb_r[N](0, ~m_port_ddr[N] & ~m_port_mask[N]) & ~m_port_mask[N]);
-		if (newval != m_port_input[N])
-		{
-			LOGIOPORT("read PORT%c: new input = %02X & %02X (was %02X)\n",
-					char('A' + N), newval, ~m_port_ddr[N] & ~m_port_mask[N], m_port_input[N]);
-		}
 		m_port_input[N] = newval;
 	}
 	return m_port_mask[N] | (m_port_latch[N] & m_port_ddr[N]) | (m_port_input[N] & ~m_port_ddr[N]);
@@ -300,8 +289,6 @@ template <std::size_t N> void m6805_hmos_device::port_latch_w(u8 data)
 {
 	data &= ~m_port_mask[N];
 	u8 const diff = m_port_latch[N] ^ data;
-	if (diff)
-		LOGIOPORT("write PORT%c latch: %02X & %02X (was %02X)\n", char('A' + N), data, m_port_ddr[N], m_port_latch[N]);
 	m_port_latch[N] = data;
 	if (diff & m_port_ddr[N])
 		port_cb_w<N>();
@@ -312,7 +299,6 @@ template <std::size_t N> void m6805_hmos_device::port_ddr_w(u8 data)
 	data &= ~m_port_mask[N];
 	if (data != m_port_ddr[N])
 	{
-		LOGIOPORT("write DDR%c: %02X (was %02X)\n", char('A' + N), data, m_port_ddr[N]);
 		m_port_ddr[N] = data;
 		port_cb_w<N>();
 	}
@@ -341,16 +327,12 @@ void m68705_device::pcr_w(u8 data)
 	// 1  /PGE   RW  Program Enable
 	// 0  /PLE   RW  Programming Latch Enable
 
-	LOGEPROM("write PCR: /PGE=%u%s /PLE=%u\n", BIT(data, 1), BIT(data, 0) ? " [inhibited]" : "", BIT(data, 0));
-
 	// lock out /PGE if /PLE is not asserted
 	data |= ((data & 0x01) << 1);
 
 	// write EPROM if /PGE is asserted (erase requires UV so don't clear bits)
 	if (!pcr_pge() && !BIT(data, 1))
 	{
-		LOGEPROM("write EPROM%s: %04X = %02X | %02X\n",
-				pcr_vpon() ? "" : " prevented when Vpp low", m_pl_addr, m_pl_data, m_user_rom[m_pl_addr]);
 		if (pcr_vpon())
 			m_user_rom[m_pl_addr] |= m_pl_data;
 	}
@@ -486,7 +468,6 @@ void m68705_device::device_reset()
 
 	if (CLEAR_LINE != m_vihtp)
 	{
-		LOG("loading bootstrap vector\n");
 		if (m_params.m_addr_width > 13)
 			rm16<true>(M68705_VECTOR_BOOTSTRAP, m_pc);
 		else
@@ -494,7 +475,6 @@ void m68705_device::device_reset()
 	}
 	else
 	{
-		LOG("loading reset vector\n");
 		if (m_params.m_addr_width > 13)
 			rm16<true>(M6805_VECTOR_RESET, m_pc);
 		else
@@ -570,7 +550,6 @@ void m6805_hmos_device::interrupt()
 
 			if (BIT(m_pending_interrupts, M6805_IRQ_LINE))
 			{
-				LOGINT("servicing /INT interrupt\n");
 				m_pending_interrupts &= ~(1 << M6805_IRQ_LINE);
 				if (m_params.m_addr_width > 13)
 					rm16<true>(M6805_VECTOR_INT, m_pc);
@@ -579,7 +558,6 @@ void m6805_hmos_device::interrupt()
 			}
 			else if (BIT(m_pending_interrupts, M6805_INT_TIMER))
 			{
-				LOGINT("servicing timer/counter interrupt\n");
 				if (m_params.m_addr_width > 13)
 					rm16<true>(M6805_VECTOR_TIMER, m_pc);
 				else
@@ -943,9 +921,6 @@ std::unique_ptr<util::disasm_interface> m6805_hmos_device::create_disassembler()
 
 void m6805_timer::tcr_w(u8 data)
 {
-	if (VERBOSE & LOG_TIMER)
-		m_parent.logerror("tcr_w 0x%02x\n", data);
-
 	if (m_options & TIMER_MOR)
 		data |= TCR_TIE;
 
@@ -983,9 +958,6 @@ void m6805_timer::update(unsigned count)
 
 	if (interrupt)
 	{
-		if (VERBOSE & LOG_TIMER)
-			m_parent.logerror("timer interrupt\n");
-
 		m_tcr |= TCR_TIR;
 
 		if (!(m_tcr & TCR_TIM))

@@ -287,7 +287,6 @@ end
 		"softfloat",
 		"softfloat3",
 		"wdlfft",
-		"ymfm",
 		ext_lib("jpeg"),
 		"7z",
 	}

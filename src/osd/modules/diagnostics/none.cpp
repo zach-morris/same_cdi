@@ -19,18 +19,6 @@ public:
 	{
 		return 0;
 	}
-
-	void start_profiler(std::uint32_t max_seconds, std::uint8_t stack_depth) override
-	{
-	}
-
-	void stop_profiler() override
-	{
-	}
-
-	void print_profiler_results() override
-	{
-	}
 };
 
 // Determine if diagnostics_none should be used based on OSD

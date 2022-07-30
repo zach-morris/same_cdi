@@ -27,9 +27,6 @@
 #define M_SQRT2 1.41421356237309504880
 #endif
 
-// define this to display debug info about the filters being set up
-#undef FLT_BIQUAD_DEBUG_SETUP
-
 // device type definition
 DEFINE_DEVICE_TYPE(FILTER_BIQUAD, filter_biquad_device, "filter_biquad", "Biquad Filter")
 
@@ -161,9 +158,6 @@ filter_biquad_device::biquad_params filter_biquad_device::opamp_sk_lowpass_calc(
 	r.gain = 1.0 + (r4 / r3); // == (r3 + r4) / r3
 	r.fc = 1.0 / (2 * M_PI * sqrt(r1 * r2 * c1 * c2));
 	r.q = sqrt(r1 * r2 * c1 * c2) / ((r1 * c2) + (r2 * c2) + ((r2 * c1) * (1.0 - r.gain)));
-#ifdef FLT_BIQUAD_DEBUG_SETUP
-		logerror("filter_biquad_device::opamp_sk_lowpass_calc(%f, %f, %f, %f, %f, %f) yields: fc = %f, Q = %f, gain = %f\n", r1, r2, r3, r4, c1*1000000, c2*1000000, r.fc, r.q, r.gain);
-#endif
 	return r;
 }
 
@@ -226,9 +220,6 @@ filter_biquad_device::biquad_params filter_biquad_device::opamp_mfb_lowpass_calc
 		r.q = sqrt(r2 * r3 * c1 * c2) / ((r3 * c2) + (r2 * c2) + ((r2 * c2) * -r.gain));
 		r.type = biquad_type::LOWPASS;
 	}
-#ifdef FLT_BIQUAD_DEBUG_SETUP
-		logerror("filter_biquad_device::opamp_mfb_lowpass_calc(%f, %f, %f, %f, %f) yields:\n\ttype = %d, fc = %f, Q = %f, gain = %f\n", r1, r2, r3, c1*1000000, c2*1000000, static_cast<int>(r.type), r.fc, r.q, r.gain);
-#endif
 	return r;
 }
 
@@ -280,9 +271,6 @@ filter_biquad_device& filter_biquad_device::opamp_mfb_bandpass_setup(double r1, 
 	double const fc = 1.0 / (2 * M_PI * sqrt(r_in * r3 * c1 * c2)); // technically this is the center frequency of the bandpass
 	double const q = sqrt(r3 / r_in * c1 * c2) / (c1 + c2);
 	gain *= -r3 / r_in * c2 / (c1 + c2);
-#ifdef FLT_BIQUAD_DEBUG_SETUP
-	logerror("filter_biquad_device::opamp_mfb_bandpass_setup() yields: fc = %f, Q = %f, gain = %f\n", fc, q, gain);
-#endif
 	return setup(biquad_type::BANDPASS, fc, q, gain);
 }
 
@@ -315,9 +303,6 @@ filter_biquad_device& filter_biquad_device::opamp_mfb_highpass_setup(double r1, 
 	double const gain = -c1 / c3;
 	double const fc = 1.0 / (2 * M_PI * sqrt(c2 * c3 * r1 * r2));
 	double const q = sqrt(c2 * c3 * r1 * r2) / ((c2 * r1) + (c3 * r1) + ((c3 * r1) * -gain));
-#ifdef FLT_BIQUAD_DEBUG_SETUP
-	logerror("filter_biquad_device::opamp_mfb_highpass_setup() yields: fc = %f, Q = %f, gain = %f\n", fc, q, gain);
-#endif
 	return setup(biquad_type::HIGHPASS, fc, q, gain);
 }
 
@@ -367,9 +352,6 @@ filter_biquad_device::biquad_params filter_biquad_device::opamp_diff_bandpass_ca
 	r.fc = pow(10.0, fct);
 	r.q = r.fc / (f2 - f1);
 	r.type = biquad_type::BANDPASS;
-#ifdef FLT_BIQUAD_DEBUG_SETUP
-		logerror("filter_biquad_device::opamp_diff_bandpass_calc(%f, %f, %f, %f) yields:\n\ttype = %d, fc = %f (f1 = %f, f2 = %f), Q = %f, gain = %f\n", r1, r2, c1*1000000, c2*1000000, static_cast<int>(r.type), r.fc, f1, f2, r.q, r.gain);
-#endif
 	return r;
 }
 
@@ -550,17 +532,6 @@ void filter_biquad_device::recalc()
 			fatalerror("filter_biquad_device::recalc() - Invalid filter type!");
 			break;
 	}
-#ifdef FLT_BIQUAD_DEBUG
-	logerror("Calculated Parameters:\n");
-	logerror( "Gain (dB): %f, (raw): %f\n", DBGain, MGain);
-	logerror( "k: %f\n", K);
-	logerror( "normal: %f\n", normal);
-	logerror("b0: %f\n", m_b0);
-	logerror("b1: %f\n", m_b1);
-	logerror("b2: %f\n", m_b2);
-	logerror("a1: %f\n", m_a1);
-	logerror("a2: %f\n", m_a2);
-#endif
 	// peak and shelf filters do not use gain for the entire signal, only for the peak/shelf portions
 	// side note: the first order lowpass and highpass filter analogs technically don't have gain either,
 	// but this can be 'faked' by adjusting the bx factors, so we support that anyway, even if it isn't realistic.
@@ -571,11 +542,6 @@ void filter_biquad_device::recalc()
 		m_b0 *= m_gain;
 		m_b1 *= m_gain;
 		m_b2 *= m_gain;
-#ifdef FLT_BIQUAD_DEBUG
-		logerror("b0g: %f\n", m_b0);
-		logerror("b1g: %f\n", m_b1);
-		logerror("b2g: %f\n", m_b2);
-#endif
 	}
 }
 

@@ -13,11 +13,6 @@
 
 #include <algorithm>
 
-
-#define OUTPUT_VERBOSE 0
-
-
-
 //**************************************************************************
 //  OUTPUT ITEM
 //**************************************************************************
@@ -38,8 +33,6 @@ output_manager::output_item::output_item(
 
 void output_manager::output_item::notify(s32 value)
 {
-	if (OUTPUT_VERBOSE)
-		m_manager.machine().logerror("Output %s = %d (was %d)\n", m_name, value, m_value);
 	m_value = value;
 
 	// call the local notifiers first
@@ -106,8 +99,6 @@ void output_manager::register_save()
 
 	// register the reserved space for saving
 	machine().save().save_pointer(nullptr, "output", nullptr, 0, NAME(m_save_data), m_itemtable.size());
-	if (OUTPUT_VERBOSE)
-		osd_printf_verbose("Registered %u outputs for save states\n", m_itemtable.size());
 
 }
 
@@ -132,9 +123,6 @@ output_manager::output_item *output_manager::find_item(std::string_view string)
 
 output_manager::output_item &output_manager::create_new_item(std::string_view outname, s32 value)
 {
-	if (OUTPUT_VERBOSE)
-		osd_printf_verbose("Creating output %s = %d%s\n", outname, value, m_save_data ? " (will not be saved)" : "");
-
 	auto const ins(m_itemtable.emplace(
 			std::piecewise_construct,
 			std::forward_as_tuple(outname),

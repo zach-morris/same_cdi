@@ -11,9 +11,6 @@
 #include "emu.h"
 #include "screen.h"
 
-#define VERBOSE 0
-
-
 //**************************************************************************
 //  DEVICE INTERFACE MANAGEMENT
 //**************************************************************************
@@ -297,9 +294,6 @@ void device_palette_interface::set_shadow_dRGB32(int mode, int dr, int dg, int d
 	stable.dg = dg;
 	stable.db = db;
 	stable.noclip = noclip;
-
-	if (VERBOSE)
-		device().popmessage("shadow %d recalc %d %d %d %02x", mode, dr, dg, db, noclip);
 
 	// regenerate the table
 	for (int i = 0; i < 32768; i++)
