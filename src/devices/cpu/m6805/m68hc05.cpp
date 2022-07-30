@@ -208,11 +208,6 @@ u8 m68hc05_device::port_read(offs_t offset)
 	{
 		u8 const newval(m_port_cb_r[offset](0, ~m_port_ddr[offset] & m_port_bits[offset]) & m_port_bits[offset]);
 		u8 const diff(newval ^ m_port_input[offset]);
-		if (diff)
-		{
-			LOGIOPORT("read PORT%c: new input = %02X & %02X (was %02X)\n",
-					char('A' + offset), newval, ~m_port_ddr[offset] & m_port_bits[offset], m_port_input[offset]);
-		}
 		m_port_input[offset] = newval;
 		if (diff & m_port_interrupt[offset] & ~m_port_ddr[offset])
 			update_port_irq();
@@ -225,11 +220,6 @@ void m68hc05_device::port_latch_w(offs_t offset, u8 data)
 	offset &= PORT_COUNT - 1;
 	data &= m_port_bits[offset];
 	u8 const diff = m_port_latch[offset] ^ data;
-	if (diff)
-	{
-		LOGIOPORT("write PORT%c latch: %02X & %02X (was %02X)\n",
-				char('A' + offset), data, m_port_ddr[offset], m_port_latch[offset]);
-	}
 	m_port_latch[offset] = data;
 	if (diff & m_port_ddr[offset])
 		m_port_cb_w[offset](0, port_value(offset), m_port_ddr[offset]);
@@ -247,19 +237,12 @@ void m68hc05_device::port_ddr_w(offs_t offset, u8 data)
 	u8 const diff(data ^ m_port_ddr[offset]);
 	if (diff)
 	{
-		LOGIOPORT("write DDR%c: %02X (was %02X)\n", char('A' + offset), data, m_port_ddr[offset]);
 		m_port_ddr[offset] = data;
 		if (diff & m_port_interrupt[offset])
 		{
 			if (!m_port_cb_r[offset].isnull())
 			{
 				u8 const newval(m_port_cb_r[offset](0, ~m_port_ddr[offset] & m_port_bits[offset]) & m_port_bits[offset]);
-				u8 const diff(newval ^ m_port_input[offset]);
-				if (diff)
-				{
-					LOGIOPORT("read PORT%c: new input = %02X & %02X (was %02X)\n",
-							char('A' + offset), newval, ~m_port_ddr[offset] & m_port_bits[offset], m_port_input[offset]);
-				}
 				m_port_input[offset] = newval;
 			}
 			update_port_irq();
@@ -277,8 +260,6 @@ u8 m68hc05_device::tcr_r()
 void m68hc05_device::tcr_w(u8 data)
 {
 	data &= 0xe3;
-	LOGTIMER("write TCR: ICIE=%u OCIE=%u TOIE=%u IEDG=%u OLVL=%u\n",
-			BIT(data, 7), BIT(data, 6), BIT(data, 5), BIT(data, 1), BIT(data, 0));
 	m_tcr = data;
 	if (m_tcr & m_tsr & 0xe0)
 		m_pending_interrupts |= M68HC05_INT_TIMER;
@@ -289,15 +270,7 @@ void m68hc05_device::tcr_w(u8 data)
 u8 m68hc05_device::tsr_r()
 {
 	if (!machine().side_effects_disabled())
-	{
-		u8 const events(m_tsr & ~m_tsr_seen);
-		if (events)
-		{
-			LOGTIMER("read TSR: seen%s%s%s\n",
-					BIT(events, 7) ? " ICF" : "", BIT(events, 6) ? " OCF" : "", BIT(events, 5) ? " TOF" : "");
-		}
 		m_tsr_seen = m_tsr;
-	}
 	return m_tsr;
 }
 
@@ -313,17 +286,14 @@ u8 m68hc05_device::icr_r(offs_t offset)
 		{
 			if (BIT(m_tsr_seen, 7))
 			{
-				LOGTIMER("read ICRL, clear ICF\n");
 				m_tsr &= 0x7f;
 				m_tsr_seen &= 0x7f;
 				if (!(m_tcr & m_tsr & 0xe0)) m_pending_interrupts &= ~M68HC05_INT_TIMER;
 			}
-			if (m_inhibit_cap) LOGTIMER("read ICRL, enable capture\n");
 			m_inhibit_cap = false;
 		}
 		else
 		{
-			if (!m_inhibit_cap) LOGTIMER("read ICRH, inhibit capture\n");
 			m_inhibit_cap = true;
 		}
 	}
@@ -337,7 +307,6 @@ u8 m68hc05_device::ocr_r(offs_t offset)
 	u8 const low(BIT(offset, 0));
 	if (!machine().side_effects_disabled() && low && BIT(m_tsr_seen, 6))
 	{
-		LOGTIMER("read OCRL, clear OCF\n");
 		m_tsr &= 0xbf;
 		m_tsr_seen &= 0xbf;
 		if (!(m_tcr & m_tsr & 0xe0)) m_pending_interrupts &= ~M68HC05_INT_TIMER;
@@ -357,17 +326,14 @@ void m68hc05_device::ocr_w(offs_t offset, u8 data)
 		{
 			if (BIT(m_tsr_seen, 6))
 			{
-				LOGTIMER("write OCRL, clear OCF\n");
 				m_tsr &= 0xbf;
 				m_tsr_seen &= 0xbf;
 				if (!(m_tcr & m_tsr & 0xe0)) m_pending_interrupts &= ~M68HC05_INT_TIMER;
 			}
-			if (m_inhibit_cmp) LOGTIMER("write OCRL, enable compare\n");
 			m_inhibit_cmp = false;
 		}
 		else
 		{
-			if (!m_inhibit_cmp) LOGTIMER("write OCRH, inhibit compare\n");
 			m_inhibit_cmp = true;
 		}
 	}
@@ -387,11 +353,9 @@ u8 m68hc05_device::timer_r(offs_t offset)
 	{
 		if (!machine().side_effects_disabled())
 		{
-			if (m_trl_latched[alt]) LOGTIMER("read %sTRL, read sequence complete\n", alt ? "A" : "");
 			m_trl_latched[alt] = false;
 			if (!alt && BIT(m_tsr_seen, 5))
 			{
-				LOGTIMER("read TRL, clear TOF\n");
 				m_tsr &= 0xdf;
 				m_tsr_seen &= 0xdf;
 				if (!(m_tcr & m_tsr & 0xe0)) m_pending_interrupts &= ~M68HC05_INT_TIMER;
@@ -403,7 +367,6 @@ u8 m68hc05_device::timer_r(offs_t offset)
 	{
 		if (!machine().side_effects_disabled() && !m_trl_latched[alt])
 		{
-			LOGTIMER("read %sTRH, latch %sTRL\n", alt ? "A" : "", alt ? "A" : "");
 			m_trl_latched[alt] = true;
 			m_trl_buf[alt] = u8(m_counter);
 		}
@@ -414,7 +377,6 @@ u8 m68hc05_device::timer_r(offs_t offset)
 
 void m68hc05_device::coprst_w(u8 data)
 {
-	LOGCOP("write COPRST=%02x%s\n", data, ((0xaa == data) && (0x55 == m_coprst)) ? ", reset" : "");
 	if (0x55 == data)
 	{
 		m_coprst = data;
@@ -431,7 +393,6 @@ u8 m68hc05_device::copcr_r()
 	u8 const result(m_copcr);
 	if (!machine().side_effects_disabled())
 	{
-		if (copcr_copf()) LOGCOP("read COPCR, clear COPF\n");
 		m_copcr &= 0xef;
 	}
 	return result;
@@ -439,14 +400,11 @@ u8 m68hc05_device::copcr_r()
 
 void m68hc05_device::copcr_w(u8 data)
 {
-	LOGCOP("write COPCR: CME=%u PCOPE=%u [%s] CM=%u\n",
-			BIT(data, 3), BIT(data, 2), (!copcr_pcope() && BIT(data, 2)) ? "set" : "ignored", data & 0x03);
 	m_copcr = (m_copcr & 0xf4) | (data & 0x0f); // PCOPE is set-only, hence the mask overlap
 }
 
 void m68hc05_device::copr_w(u8 data)
 {
-	LOGCOP("write COPR: COPC=%u\n", BIT(data, 0));
 	if (!BIT(data, 0)) m_ncop_cnt = 0;
 }
 
@@ -544,7 +502,6 @@ void m68hc05_device::execute_set_input(int inputnum, int state)
 	case M68HC05_IRQ_LINE:
 		if ((CLEAR_LINE != state) && !m_irq_line_state)
 		{
-			LOGINT("/IRQ edge%s\n", (m_port_irq_state || m_irq_latch) ? "" : ", set IRQ latch");
 			if (!m_port_irq_state)
 			{
 				m_irq_latch = 1;
@@ -556,7 +513,6 @@ void m68hc05_device::execute_set_input(int inputnum, int state)
 	case M68HC05_TCAP_LINE:
 		if ((bool(state) != m_tcap_state) && (bool(state) == tcr_iedg()))
 		{
-			LOGTIMER("input capture %04X%s\n", m_counter, m_inhibit_cap ? " [inhibited]" : "");
 			if (!m_inhibit_cap)
 			{
 				m_tsr |= 0x80;
@@ -609,7 +565,6 @@ void m68hc05_device::interrupt()
 
 		if (m_pending_interrupts & M68HC05_INT_IRQ)
 		{
-			LOGINT("servicing external interrupt\n");
 			m_irq_latch = 0;
 			m_pending_interrupts &= ~M68HC05_INT_IRQ;
 			if (m_params.m_addr_width > 13)
@@ -619,7 +574,6 @@ void m68hc05_device::interrupt()
 		}
 		else if (m_pending_interrupts & M68HC05_INT_TIMER)
 		{
-			LOGINT("servicing timer interrupt\n");
 			if (m_params.m_addr_width > 13)
 				rm16<true>(M68HC05_VECTOR_TIMER & m_params.m_vector_mask, m_pc);
 			else
@@ -652,12 +606,10 @@ void m68hc05_device::burn_cycles(unsigned count)
 	m_counter = u16(new_counter);
 	if (timer_rollover)
 	{
-		LOGTIMER("timer rollover\n");
 		m_tsr |= 0x20;
 	}
 	if (output_compare_match)
 	{
-		LOGTIMER("output compare match %s\n", m_inhibit_cmp ? " [inhibited]" : "");
 		if (!m_inhibit_cmp)
 		{
 			m_tsr |= 0x40;
@@ -670,7 +622,6 @@ void m68hc05_device::burn_cycles(unsigned count)
 	u32 const pcop_timeout(u32(1) << ((copcr_cm() << 1) + 15));
 	if (copcr_pcope() && (pcop_timeout <= ((m_pcop_cnt & (pcop_timeout - 1)) + count)))
 	{
-		LOGCOP("PCOP reset\n");
 		m_copcr |= 0x10;
 		pulse_input_line(INPUT_LINE_RESET, attotime::zero);
 	}
@@ -681,7 +632,6 @@ void m68hc05_device::burn_cycles(unsigned count)
 	if (m_ncope && ((u32(1) << 17) <= m_ncop_cnt))
 	{
 		pulse_input_line(INPUT_LINE_RESET, attotime::zero);
-		LOGCOP("NCOP reset\n");
 	}
 	m_ncop_cnt &= (u32(1) << 17) - 1;
 }
@@ -738,8 +688,6 @@ void m68hc05_device::update_port_irq()
 
 	if (bool(state) != m_port_irq_state)
 	{
-		LOGINT("I/O port IRQ state now %u%s\n",
-				state ? 1 : 0, (!m_irq_line_state && state && !m_irq_latch) ? ", set IRQ latch" : "");
 		m_port_irq_state = bool(state);
 		if (!m_irq_line_state && state)
 		{

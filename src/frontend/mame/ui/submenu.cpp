@@ -15,11 +15,7 @@
 #include "ui/ui.h"
 #include "ui/utils.h"
 
-#if defined(UI_WINDOWS) && !defined(UI_SDL)
-#include "../osd/windows/winmain.h"
-#else
 #include "../osd/modules/lib/osdobj_common.h"
-#endif
 #include "../osd/modules/input/input_module.h"
 
 #include <limits>

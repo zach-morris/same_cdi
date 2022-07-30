@@ -11,15 +11,7 @@
 #include "emu.h"
 #include "debugger.h"
 
-//**************************************************************************
-//  DEBUGGING
-//**************************************************************************
-
-#define VERBOSE 0
-
-#define LOG(...)  do { if (VERBOSE) machine().logerror(__VA_ARGS__); } while (0)
 #define PRECISION
-
 
 
 //**************************************************************************
@@ -288,25 +280,6 @@ inline void emu_timer::schedule_next_period()
 	scheduler.timer_list_insert(*this);
 }
 
-
-//-------------------------------------------------
-//  dump - dump internal state to a single output
-//  line in the error log
-//-------------------------------------------------
-
-void emu_timer::dump() const
-{
-	machine().logerror("%p: en=%d temp=%d exp=%15s start=%15s per=%15s param=%d ptr=%p", this, m_enabled, m_temporary, m_expire.as_string(PRECISION), m_start.as_string(PRECISION), m_period.as_string(PRECISION), m_param, m_ptr);
-	if (m_device == nullptr)
-		if (m_callback.name() == nullptr)
-			machine().logerror(" cb=NULL\n");
-		else
-			machine().logerror(" cb=%s\n", m_callback.name());
-	else
-		machine().logerror(" dev=%s id=%d\n", m_device->tag(), m_id);
-}
-
-
 //-------------------------------------------------
 //  device_timer_expired - trampoline to avoid a
 //  conditional jump on the hot path
@@ -388,11 +361,7 @@ bool device_scheduler::can_save() const
 	// if any live temporary timers exit, fail
 	for (emu_timer *timer = m_timer_list; timer != nullptr; timer = timer->next())
 		if (timer->m_temporary && !timer->expire().is_never())
-		{
-			machine().logerror("Failed save state attempt due to anonymous timers:\n");
-			dump_timers();
 			return false;
-		}
 
 	// otherwise, we're good
 	return true;
@@ -450,9 +419,6 @@ void device_scheduler::timeslice()
 		if (m_timer_list->m_expire < target)
 			target = m_timer_list->m_expire;
 
-		LOG("------------------\n");
-		LOG("cpu_timeslice: target = %s\n", target.as_string(PRECISION));
-
 		// do we have pending suspension changes?
 		if (m_suspend_changes_pending)
 			apply_suspend_changes();
@@ -479,13 +445,10 @@ void device_scheduler::timeslice()
 				{
 					// compute how many cycles we want to execute
 					int ran = exec->m_cycles_running = divu_64x32(u64(delta) >> exec->m_divshift, exec->m_divisor);
-					LOG("  cpu '%s': %d (%d cycles)\n", exec->device().tag(), delta, exec->m_cycles_running);
 
 					// if we're not suspended, actually execute
 					if (exec->m_suspend == 0)
 					{
-						g_profiler.start(exec->m_profiler);
-
 						// note that this global variable cycles_stolen can be modified
 						// via the call to cpu_execute
 						exec->m_cycles_stolen = 0;
@@ -505,7 +468,6 @@ void device_scheduler::timeslice()
 						ran -= *exec->m_icountptr;
 						assert(ran >= exec->m_cycles_stolen);
 						ran -= exec->m_cycles_stolen;
-						g_profiler.stop();
 					}
 
 					// account for these cycles
@@ -523,14 +485,10 @@ void device_scheduler::timeslice()
 					}
 					assert(deltatime >= attotime::zero);
 					exec->m_localtime += deltatime;
-					LOG("         %d ran, %d total, time = %s\n", ran, s32(exec->m_totalcycles), exec->m_localtime.as_string(PRECISION));
 
 					// if the new local CPU time is less than our target, move the target up, but not before the base
 					if (exec->m_localtime < target)
-					{
 						target = std::max(exec->m_localtime, m_basetime);
-						LOG("         (new target)\n");
-					}
 				}
 			}
 		}
@@ -665,20 +623,11 @@ void device_scheduler::timed_trigger(void *ptr, s32 param)
 //  presave - before creating a save state
 //-------------------------------------------------
 
-void device_scheduler::presave()
-{
-	// report the timer state after a log
-	LOG("Prior to saving state:\n");
-#if VERBOSE
-	dump_timers();
-#endif
-}
-
+void device_scheduler::presave() { }
 
 //-------------------------------------------------
 //  postload - after loading a save state
 //-------------------------------------------------
-
 void device_scheduler::postload()
 {
 	// remove all timers and make a private list of permanent ones
@@ -703,12 +652,6 @@ void device_scheduler::postload()
 
 	m_suspend_changes_pending = true;
 	rebuild_execute_list();
-
-	// report the timer state after a log
-	LOG("After resetting/reordering timers:\n");
-#if VERBOSE
-	dump_timers();
-#endif
 }
 
 
@@ -877,8 +820,6 @@ inline emu_timer &device_scheduler::timer_list_remove(emu_timer &timer)
 
 inline void device_scheduler::execute_timers()
 {
-	LOG("execute_timers: new=%s head->expire=%s\n", m_basetime.as_string(PRECISION), m_timer_list->m_expire.as_string(PRECISION));
-
 	// now process any timers that are overdue
 	while (m_timer_list->m_expire <= m_basetime)
 	{
@@ -896,18 +837,8 @@ inline void device_scheduler::execute_timers()
 		// call the callback
 		if (was_enabled)
 		{
-			g_profiler.start(PROFILER_TIMER_CALLBACK);
-
 			if (!timer.m_callback.isnull())
-			{
-				if (timer.m_device != nullptr)
-					LOG("execute_timers: timer device %s timer %d\n", timer.m_device->tag(), timer.m_id);
-				else
-					LOG("execute_timers: timer callback %s\n", timer.m_callback.name());
 				timer.m_callback(timer.m_ptr, timer.m_param);
-			}
-
-			g_profiler.stop();
 		}
 
 		// reset or remove the timer, but only if it wasn't modified during the callback
@@ -970,18 +901,4 @@ void device_scheduler::add_scheduling_quantum(const attotime &quantum, const att
 		quant.m_expire = expire;
 		m_quantum_list.insert_after(quant, insert_after);
 	}
-}
-
-
-//-------------------------------------------------
-//  dump_timers - dump the current timer state
-//-------------------------------------------------
-
-void device_scheduler::dump_timers() const
-{
-	machine().logerror("=============================================\n");
-	machine().logerror("Timer Dump: Time = %15s\n", time().as_string(PRECISION));
-	for (emu_timer *timer = first_timer(); timer != nullptr; timer = timer->next())
-		timer->dump();
-	machine().logerror("=============================================\n");
 }

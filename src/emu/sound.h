@@ -82,21 +82,7 @@ constexpr u32 SAMPLE_RATE_MINIMUM = 50;
 //  DEBUGGING
 //**************************************************************************
 
-// turn this on to enable aggressive assertions and other checks
-#ifdef MAME_DEBUG
-#define SOUND_DEBUG (1)
-#else
-#define SOUND_DEBUG (0)
-#endif
-
-// if SOUND_DEBUG is on, make assertions fire regardless of MAME_DEBUG
-#if (SOUND_DEBUG)
-#define sound_assert(x) do { if (!(x)) { osd_printf_error("sound_assert: " #x "\n"); osd_break_into_debugger("sound_assert: " #x "\n"); } } while (0)
-#else
 #define sound_assert assert
-#endif
-
-
 
 //**************************************************************************
 //  TYPE DEFINITIONS
@@ -155,9 +141,6 @@ private:
 	{
 		sound_assert(u32(index) < size());
 		sample_t value = m_buffer[index];
-#if (SOUND_DEBUG)
-		sound_assert(!std::isnan(value));
-#endif
 		return value;
 	}
 
@@ -205,18 +188,6 @@ private:
 	u32 m_sample_rate;                    // sample rate of the data in the buffer
 	attoseconds_t m_sample_attos;         // pre-computed attoseconds per sample
 	std::vector<sample_t> m_buffer;       // vector of actual buffer data
-
-#if (SOUND_DEBUG)
-public:
-	// for debugging, provide an interface to write a WAV stream
-	void open_wav(char const *filename);
-	void flush_wav();
-
-private:
-	// internal debugging state
-	util::wav_file_ptr m_wav_file;        // pointer to the current WAV file
-	u32 m_last_written = 0;               // last written sample index
-#endif
 };
 
 
@@ -472,10 +443,6 @@ private:
 
 class sound_stream_output
 {
-#if (SOUND_DEBUG)
-	friend class sound_stream;
-#endif
-
 public:
 	// construction/destruction
 	sound_stream_output();
@@ -526,10 +493,6 @@ private:
 
 class sound_stream_input
 {
-#if (SOUND_DEBUG)
-	friend class sound_stream;
-#endif
-
 public:
 	// construction/destruction
 	sound_stream_input();
@@ -650,11 +613,6 @@ public:
 
 	// apply any pending sample rate changes; should only be called by the sound manager
 	void apply_sample_rate_changes(u32 updatenum, u32 downstream_rate);
-
-#if (SOUND_DEBUG)
-	// print one level of the sound graph and recursively tell our inputs to do the same
-	void print_graph_recursive(int indent, int index);
-#endif
 
 protected:
 	// protected state

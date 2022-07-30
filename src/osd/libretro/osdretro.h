@@ -23,9 +23,6 @@
 #define RETROOPTION_JOYINDEX              "joy_idx"
 #define RETROOPTION_KEYBINDEX             "keyb_idx"
 #define RETROOPTION_MOUSEINDEX            "mouse_index"
-#if (USE_XINPUT)
-#define RETROOPTION_LIGHTGUNINDEX         "lightgun_index"
-#endif
 
 #define RETROOPTION_AUDIODRIVER           "audiodriver"
 #define RETROOPTION_VIDEODRIVER           "videodriver"

@@ -254,12 +254,10 @@ void cdi_state::bus_error_w(offs_t offset, uint16_t data)
 
 void quizard_state::mcu_rtsn_from_cpu(int state)
 {
-	LOGMASKED(LOG_UART, "MCU receiving RTSN from CPU: %d\n", state);
 }
 
 void quizard_state::mcu_rx_from_cpu(uint8_t data)
 {
-	LOGMASKED(LOG_UART, "MCU receiving %02x from CPU\n", data);
 	if (m_mcu_initial_byte)
 	{
 		m_mcu_initial_byte = false;
@@ -275,7 +273,6 @@ void quizard_state::mcu_rx_from_cpu(uint8_t data)
 uint8_t quizard_state::mcu_p0_r()
 {
 	const uint8_t data = m_inputs[0]->read();
-	LOGMASKED(LOG_QUIZARD_READS, "%s: MCU Port 0 Read (%02x)\n", machine().describe_context(), data);
 	return data;
 }
 
@@ -284,54 +281,45 @@ uint8_t quizard_state::mcu_p1_r()
 	uint8_t data = m_inputs[1]->read();
 	if (BIT(~m_inputs[0]->read(), 4))
 		data &= ~(1 << 4);
-	LOGMASKED(LOG_QUIZARD_READS, "%s: MCU Port 1 Read (%02x)\n", machine().describe_context(), data);
 	return data;
 }
 
 uint8_t quizard_state::mcu_p2_r()
 {
 	const uint8_t data = m_inputs[2]->read();
-	LOGMASKED(LOG_QUIZARD_READS, "%s: MCU Port 2 Read (%02x)\n", machine().describe_context(), data);
 	return data;
 }
 
 uint8_t quizard_state::mcu_p3_r()
 {
-	LOGMASKED(LOG_QUIZARD_READS, "%s: MCU Port 3 Read (%02x)\n", machine().describe_context(), 0x04);
 	return 0x04;
 }
 
 void quizard_state::mcu_p0_w(uint8_t data)
 {
-	LOGMASKED(LOG_QUIZARD_WRITES, "%s: MCU Port 0 Write (%02x)\n", machine().describe_context(), data);
 }
 
 void quizard_state::mcu_p1_w(uint8_t data)
 {
-	LOGMASKED(LOG_QUIZARD_WRITES, "%s: MCU Port 1 Write (%02x)\n", machine().describe_context(), data);
 }
 
 void quizard_state::mcu_p2_w(uint8_t data)
 {
-	LOGMASKED(LOG_QUIZARD_WRITES, "%s: MCU Port 2 Write (%02x)\n", machine().describe_context(), data);
 }
 
 void quizard_state::mcu_p3_w(uint8_t data)
 {
-	LOGMASKED(LOG_QUIZARD_WRITES, "%s: MCU Port 3 Write (%02x)\n", machine().describe_context(), data);
 	m_maincpu->uart_ctsn(BIT(data, 6));
 }
 
 void quizard_state::mcu_tx(uint8_t data)
 {
-	LOGMASKED(LOG_QUIZARD_OTHER, "%s: MCU transmitting %02x\n", machine().describe_context(), data);
 	m_maincpu->uart_rx(data);
 }
 
 uint8_t quizard_state::mcu_rx()
 {
 	uint8_t data = m_mcu_rx_from_cpu;
-	LOGMASKED(LOG_QUIZARD_OTHER, "%s: MCU receiving %02x\n", machine().describe_context(), data);
 	return data;
 }
 
@@ -341,13 +329,11 @@ uint8_t quizard_state::mcu_rx()
 
 uint16_t cdi_state::dvc_r(offs_t offset, uint16_t mem_mask)
 {
-	LOGMASKED(LOG_DVC, "%s: dvc_r: %08x = 0000 & %04x\n", machine().describe_context(), 0xe80000 + (offset << 1), mem_mask);
 	return 0;
 }
 
 void cdi_state::dvc_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
-	LOGMASKED(LOG_DVC, "%s: dvc_w: %08x = %04x & %04x\n", machine().describe_context(), 0xe80000 + (offset << 1), data, mem_mask);
 }
 
 /*************************

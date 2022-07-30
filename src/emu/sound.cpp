@@ -15,20 +15,6 @@
 #include "config.h"
 #include "wavwrite.h"
 
-
-
-//**************************************************************************
-//  DEBUGGING
-//**************************************************************************
-
-#define VERBOSE         (0)
-
-#define VPRINTF(x)      do { if (VERBOSE) osd_printf_debug x; } while (0)
-
-#define LOG_OUTPUT_WAV  (0)
-
-
-
 //**************************************************************************
 //  CONSTANTS
 //**************************************************************************
@@ -67,10 +53,6 @@ stream_buffer::stream_buffer(u32 sample_rate) :
 
 stream_buffer::~stream_buffer()
 {
-#if (SOUND_DEBUG)
-	if (m_wav_file)
-		flush_wav();
-#endif
 }
 
 
@@ -120,14 +102,7 @@ void stream_buffer::set_sample_rate(u32 rate, bool resample)
 			for (int index = 0; index < buffered_samples; index++)
 			{
 				end = prev_index(end);
-#if (SOUND_DEBUG)
-				// multiple resamples can occur before clearing out old NaNs so
-				// neuter them for this specific case
-				if (std::isnan(m_buffer[end]))
-					buffer[index] = 0;
-				else
-#endif
-					buffer[index] = get(end);
+				buffer[index] = get(end);
 			}
 		}
 	}
@@ -147,12 +122,6 @@ void stream_buffer::set_sample_rate(u32 rate, bool resample)
 	// otherwise just copy our previously-downsampled data
 	if (resample)
 	{
-#if (SOUND_DEBUG)
-		// for aggressive debugging, fill the buffer with NANs to catch anyone
-		// reading beyond what we resample below
-		fill(NAN);
-#endif
-
 		if (new_rate_higher)
 			backfill_upsample(&buffer[0], buffered_samples, prevend, prevperiod);
 		else
@@ -170,56 +139,6 @@ void stream_buffer::set_sample_rate(u32 rate, bool resample)
 	else
 		fill(0);
 }
-
-
-//-------------------------------------------------
-//  open_wav - open a WAV file for logging purposes
-//-------------------------------------------------
-
-#if (SOUND_DEBUG)
-void stream_buffer::open_wav(char const *filename)
-{
-	// always open at 48k so that sound programs can handle it
-	// re-sample as needed
-	m_wav_file = util::wav_open(filename, 48000, 1);
-}
-#endif
-
-
-//-------------------------------------------------
-//  flush_wav - flush data to the WAV file
-//-------------------------------------------------
-
-#if (SOUND_DEBUG)
-void stream_buffer::flush_wav()
-{
-	// skip if no file
-	if (!m_wav_file)
-		return;
-
-	// grab a view of the data from the last-written point
-	read_stream_view view(this, m_last_written, m_end_sample, 1.0f);
-	m_last_written = m_end_sample;
-
-	// iterate over chunks for conversion
-	s16 buffer[1024];
-	for (int samplebase = 0; samplebase < view.samples(); samplebase += std::size(buffer))
-	{
-		// clamp to the buffer size
-		int cursamples = view.samples() - samplebase;
-		if (cursamples > std::size(buffer))
-			cursamples = std::size(buffer);
-
-		// convert and fill
-		for (int sampindex = 0; sampindex < cursamples; sampindex++)
-			buffer[sampindex] = s16(view.get(samplebase + sampindex) * 32768.0);
-
-		// write to the WAV
-		util::wav_add_data_16(*m_wav_file, buffer, cursamples);
-	}
-}
-#endif
-
 
 //-------------------------------------------------
 //  index_time - return the attotime of a given
@@ -284,15 +203,8 @@ void stream_buffer::backfill_downsample(sample_t *dest, int samples, attotime ne
 	int dstindex;
 	for (dstindex = 0; dstindex < samples && time.seconds() >= 0; dstindex++)
 	{
-		u32 srcindex = time_to_buffer_index(time, false);
-#if (SOUND_DEBUG)
-		// multiple resamples can occur before clearing out old NaNs so
-		// neuter them for this specific case
-		if (std::isnan(m_buffer[srcindex]))
-			dest[dstindex] = 0;
-		else
-#endif
-			dest[dstindex] = get(srcindex);
+		u32 srcindex   = time_to_buffer_index(time, false);
+		dest[dstindex] = get(srcindex);
 		time -= newperiod;
 	}
 	for ( ; dstindex < samples; dstindex++)
@@ -373,22 +285,6 @@ void sound_stream_output::init(sound_stream &stream, u32 index, char const *tag)
 	// save our state
 	auto &save = stream.device().machine().save();
 	save.save_item(&stream.device(), "stream.output", tag, index, NAME(m_gain));
-
-#if (LOG_OUTPUT_WAV)
-	std::string filename = stream.device().machine().basename();
-	filename += stream.device().tag();
-	for (int index = 0; index < filename.size(); index++)
-		if (filename[index] == ':')
-			filename[index] = '_';
-	if (dynamic_cast<default_resampler_stream *>(&stream) != nullptr)
-		filename += "_resampler";
-	filename += "_OUT_";
-	char buf[10];
-	sprintf(buf, "%d", index);
-	filename += buf;
-	filename += ".wav";
-	m_buffer.open_wav(filename.c_str());
-#endif
 }
 
 
@@ -648,9 +544,6 @@ void sound_stream::set_sample_rate(u32 new_rate)
 
 void sound_stream::set_input(int index, sound_stream *input_stream, int output_index, float gain)
 {
-	VPRINTF(("stream_set_input(%p, '%s', %d, %p, %d, %f)\n", (void *)this, m_device.tag(),
-			index, (void *)input_stream, output_index, (double) gain));
-
 	// make sure it's a valid input
 	if (index >= m_input.size())
 		fatalerror("stream_set_input attempted to configure nonexistent input %d (%d max)\n", index, int(m_input.size()));
@@ -704,8 +597,6 @@ read_stream_view sound_stream::update_view(attotime start, attotime end, u32 out
 	if (start > end)
 		start = end;
 
-	g_profiler.start(PROFILER_SOUND);
-
 	// reposition our start to coincide with the current buffer end
 	attotime update_start = m_output[outputnum].end_time();
 	if (update_start <= end)
@@ -732,27 +623,12 @@ read_stream_view sound_stream::update_view(attotime start, attotime end, u32 out
 				sound_assert(m_resampling_disabled || m_input_view[inputnum].sample_rate() == m_sample_rate);
 			}
 
-#if (SOUND_DEBUG)
-			// clear each output view to NANs before we call the callback
-			for (unsigned int outindex = 0; outindex < m_output.size(); outindex++)
-				m_output_view[outindex].fill(NAN);
-#endif
 
 			// if we have an extended callback, that's all we need
 			m_callback_ex(*this, m_input_view, m_output_view);
 
-#if (SOUND_DEBUG)
-			// make sure everything was overwritten
-			for (unsigned int outindex = 0; outindex < m_output.size(); outindex++)
-				for (int sampindex = 0; sampindex < m_output_view[outindex].samples(); sampindex++)
-					m_output_view[outindex].get(sampindex);
-
-			for (unsigned int outindex = 0; outindex < m_output.size(); outindex++)
-				m_output[outindex].m_buffer.flush_wav();
-#endif
 		}
 	}
-	g_profiler.stop();
 
 	// return the requested view
 	return read_stream_view(m_output_view[outputnum], start);
@@ -793,9 +669,6 @@ void sound_stream::apply_sample_rate_changes(u32 updatenum, u32 downstream_rate)
 	if (new_rate != SAMPLE_RATE_INVALID && new_rate != m_sample_rate)
 	{
 		// update to the new rate and notify everyone
-#if (SOUND_DEBUG)
-		printf("stream %s changing rates %d -> %d\n", name().c_str(), m_sample_rate, new_rate);
-#endif
 		m_sample_rate = new_rate;
 		sample_rate_changed();
 	}
@@ -805,29 +678,6 @@ void sound_stream::apply_sample_rate_changes(u32 updatenum, u32 downstream_rate)
 		if (input.valid())
 			input.apply_sample_rate_changes(updatenum, m_sample_rate);
 }
-
-
-//-------------------------------------------------
-//  print_graph_recursive - helper for debugging;
-//  prints info on this stream and then recursively
-//  prints info on all inputs
-//-------------------------------------------------
-
-#if (SOUND_DEBUG)
-void sound_stream::print_graph_recursive(int indent, int index)
-{
-	osd_printf_info("%*s%s Ch.%d @ %d\n", indent, "", name(), index + m_output_base, sample_rate());
-	for (int index = 0; index < m_input.size(); index++)
-		if (m_input[index].valid())
-		{
-			if (m_input[index].m_resampler_source != nullptr)
-				m_input[index].m_resampler_source->stream().print_graph_recursive(indent + 2, m_input[index].m_resampler_source->index());
-			else
-				m_input[index].m_native_source->stream().print_graph_recursive(indent + 2, m_input[index].m_native_source->index());
-		}
-}
-#endif
-
 
 //-------------------------------------------------
 //  sample_rate_changed - recompute sample
@@ -1084,12 +934,6 @@ sound_manager::sound_manager(running_machine &machine) :
 	if (m_nosound_mode && wavfile[0] == 0 && avifile[0] == 0)
 		machine.m_sample_rate = 11025;
 
-	// count the mixers
-#if VERBOSE
-	mixer_interface_enumerator iter(machine.root_device());
-	VPRINTF(("total mixers = %d\n", iter.count()));
-#endif
-
 	// register callbacks
 	machine.configuration().config_register(
 			"mixer",
@@ -1312,25 +1156,6 @@ void sound_manager::reset()
 
 			m_speakers.emplace_back(speaker);
 		}
-
-#if (SOUND_DEBUG)
-		// dump the sound graph when we start up
-		for (speaker_device &speaker : speaker_device_enumerator(machine().root_device()))
-		{
-			int index;
-			sound_stream *output = speaker.output_to_stream_output(0, index);
-			if (output != nullptr)
-				output->print_graph_recursive(0, index);
-		}
-
-		// dump the orphan list as well
-		if (m_orphan_stream_list.size() != 0)
-		{
-			osd_printf_info("\nOrphaned streams:\n");
-			for (auto &stream : m_orphan_stream_list)
-				osd_printf_info("   %s\n", stream.first->name());
-		}
-#endif
 	}
 }
 
@@ -1459,10 +1284,6 @@ stream_buffer::sample_t sound_manager::adjust_toward_compressor_scale(stream_buf
 
 void sound_manager::update(void *ptr, int param)
 {
-	VPRINTF(("sound_update\n"));
-
-	g_profiler.start(PROFILER_SOUND);
-
 	// determine the duration of this update
 	attotime update_period = machine().time() - m_last_update;
 	sound_assert(update_period.seconds() == 0);
@@ -1521,11 +1342,6 @@ void sound_manager::update(void *ptr, int param)
 		if (m_compressor_scale > 1.0)
 			m_compressor_scale = 1.0;
 	}
-
-#if (SOUND_DEBUG)
-	if (lscale != m_compressor_scale)
-	printf("scale=%.5f\n", m_compressor_scale);
-#endif
 
 	// track whether there are pending scale changes in left/right
 	stream_buffer::sample_t lprev = 0, rprev = 0;
@@ -1597,6 +1413,4 @@ void sound_manager::update(void *ptr, int param)
 
 	// notify that new samples have been generated
 	emulator_info::sound_hook();
-
-	g_profiler.stop();
 }

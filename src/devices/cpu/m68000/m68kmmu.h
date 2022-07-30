@@ -9,12 +9,6 @@
 
 // MMU status register bit definitions
 
-#if 0
-#define MMULOG logerror
-#else
-#define MMULOG(...)
-#endif
-
 // MMU SR register fields
 static constexpr u16 M68K_MMU_SR_BUS_ERROR       = 0x8000;
 static constexpr u16 M68K_MMU_SR_SUPERVISOR_ONLY = 0x2000;
@@ -150,7 +144,6 @@ void pmmu_atc_add(u32 logical, u32 physical, int fc, const int rw)
 		// if tag bits and function code match, don't add
 		if (m_mmu_atc_tag[i] == atc_tag)
 		{
-			MMULOG("%s: hit, old %08x new %08x\n", __func__, m_mmu_atc_data[i], atc_data);
 			m_mmu_atc_data[i] = atc_data;
 			return;
 		}
@@ -179,8 +172,6 @@ void pmmu_atc_add(u32 logical, u32 physical, int fc, const int rw)
 	}
 
 	// add the entry
-	MMULOG("ATC[%2d] add: log %08x -> phys %08x (fc=%d) data=%08x\n",
-			found, (logical >> ps) << ps, (physical >> ps) << ps, fc, atc_data);
 	m_mmu_atc_tag[found] = atc_tag;
 	m_mmu_atc_data[found] = atc_data;
 }
@@ -190,7 +181,6 @@ void pmmu_atc_add(u32 logical, u32 physical, int fc, const int rw)
 // 7fff0003 001ffd10 80f05750 is what should load
 void pmmu_atc_flush()
 {
-	MMULOG("ATC flush: pc=%08x\n", m_ppc);
 	std::fill(std::begin(m_mmu_atc_tag), std::end(m_mmu_atc_tag), 0);
 	m_mmu_atc_rr = 0;
 }
@@ -210,36 +200,27 @@ void pmmu_atc_flush_fc_ea(const u16 modes)
 		break;
 
 	case 4: // flush by fc
-		MMULOG("flush by fc: %d, mask %d\n", fc, fcmask);
 		for (auto &e: m_mmu_atc_tag)
 		{
 			if ((e & M68K_MMU_ATC_VALID) && ((e >> 24) & fcmask) == fc)
-			{
-				MMULOG("flushing entry %08x\n", e);
 				e = 0;
-			}
 		}
 		break;
 
 	case 6: // flush by fc + ea
 
 		ea = DECODE_EA_32(m_ir);
-		MMULOG("flush by fc/ea: fc %d, mask %d, ea %08x\n", fc, fcmask, ea);
 		for (auto &e: m_mmu_atc_tag)
 		{
 			if ((e & M68K_MMU_ATC_VALID) &&
 				(((e >> 24) & fcmask) == fc) &&
 //              (((e >> ps) << (ps - 8)) == ((ea >> ps) << (ps - 8))))
 				( (e << ps) == (ea >> 8 << ps) ))
-			{
-				MMULOG("flushing entry %08x\n", e);
 				e = 0;
-			}
 		}
 		break;
 
 	default:
-		logerror("PFLUSH mode %d not supported\n", mode);
 		break;
 	}
 }
@@ -248,7 +229,6 @@ template<bool ptest>
 bool pmmu_atc_lookup(const u32 addr_in, const int fc, const bool rw,
 					 u32& addr_out)
 {
-	MMULOG("%s: LOOKUP addr_in=%08x, fc=%d, ptest=%d\n", __func__, addr_in, fc, ptest);
 	const int ps = (m_mmu_tc >> 20) & 0xf;
 	const u32 atc_tag = M68K_MMU_ATC_VALID | ((fc & 7) << 24) | ((addr_in >> ps) << (ps - 8));
 
@@ -292,11 +272,8 @@ bool pmmu_atc_lookup(const u32 addr_in, const int fc, const bool rw,
 			m_mmu_tmp_sr |= M68K_MMU_SR_BUS_ERROR|M68K_MMU_SR_INVALID;
 		}
 		addr_out = (atc_data << 8) | (addr_in & ~(~0 << ps));
-		MMULOG("%s: addr_in=%08x, addr_out=%08x, MMU SR %04x\n",
-				__func__, addr_in, addr_out, m_mmu_tmp_sr);
 		return true;
 	}
-	MMULOG("%s: lookup failed\n", __func__);
 	if (ptest)
 	{
 		m_mmu_tmp_sr = M68K_MMU_SR_INVALID;
@@ -343,15 +320,9 @@ void update_descriptor(const u32 tptr, const int type, const u32 entry, const bo
 	if (type == M68K_MMU_DF_DT_PAGE && !rw &&
 			!(entry & M68K_MMU_DF_MODIFIED) &&
 			!(entry & M68K_MMU_DF_WP))
-	{
-		MMULOG("%s: set M+U at %08x\n", __func__, tptr);
 		m_program->write_dword(tptr, entry | M68K_MMU_DF_USED | M68K_MMU_DF_MODIFIED);
-	}
 	else if (type != M68K_MMU_DF_DT_INVALID && !(entry & M68K_MMU_DF_USED))
-	{
-		MMULOG("%s: set U at %08x\n", __func__, tptr);
 		m_program->write_dword(tptr, entry | M68K_MMU_DF_USED);
-	}
 }
 
 template<bool _long>
@@ -424,14 +395,10 @@ bool pmmu_walk_tables(u32 addr_in, int type, u32 table, const int fc,
 		const bool indirect = (!bitpos || !(bits >> bitpos)) && indexbits;
 		u32 tbl_entry, tbl_entry2;
 
-		MMULOG("%s: type %d, table %08x, addr_in %08x, indexbits %d, pageshift %d, indirect %d table_index %08x, rw=%d fc=%d\n",
-				__func__, type, table, addr_in, indexbits, pageshift, indirect, table_index, rw, fc);
-
 		switch(type)
 		{
 			case M68K_MMU_DF_DT_INVALID:   // invalid, will cause MMU exception
 				m_mmu_tmp_sr = M68K_MMU_SR_INVALID;
-				MMULOG("PMMU: DT0 PC=%x (addr_in %08x -> %08x)\n", m_ppc, addr_in, addr_out);
 				resolved = 1;
 				break;
 
@@ -453,13 +420,11 @@ bool pmmu_walk_tables(u32 addr_in, int type, u32 table, const int fc,
 				if (indirect && (type == 2 || type == 3))
 				{
 					level++;
-					MMULOG("SHORT INDIRECT DESC: %08x\n", tbl_entry);
 					addr_out = tbl_entry & M68K_MMU_DF_IND_ADDR_MASK;
 					tbl_entry = m_program->read_dword(addr_out);
 					type = tbl_entry & M68K_MMU_DF_DT;
 				}
 
-				MMULOG("SHORT DESC: %08x\n", tbl_entry);
 				table = tbl_entry & M68K_MMU_DF_ADDR_MASK;
 				if (!machine().side_effects_disabled())
 				{
@@ -481,14 +446,12 @@ bool pmmu_walk_tables(u32 addr_in, int type, u32 table, const int fc,
 				if (indirect && (type == 2 || type == 3))
 				{
 					level++;
-					MMULOG("LONG INDIRECT DESC: %08x%08x\n", tbl_entry, tbl_entry2);
 					addr_out = tbl_entry2 & M68K_MMU_DF_IND_ADDR_MASK;
 					tbl_entry = m_program->read_dword(addr_out);
 					tbl_entry2 = m_program->read_dword(addr_out);
 					type = tbl_entry & M68K_MMU_DF_DT;
 				}
 
-				MMULOG("LONG DESC: %08x %08x\n", tbl_entry, tbl_entry2);
 				table = tbl_entry2 & M68K_MMU_DF_ADDR_MASK;
 				if (!machine().side_effects_disabled())
 				{
@@ -530,7 +493,6 @@ bool pmmu_walk_tables(u32 addr_in, int type, u32 table, const int fc,
 
 	m_mmu_tmp_sr &= 0xfff0;
 	m_mmu_tmp_sr |= level;
-	MMULOG("MMU SR after walk: %04X\n", m_mmu_tmp_sr);
 	m_mmu_tablewalk = false;
 	return resolved;
 }
@@ -541,9 +503,6 @@ u32 pmmu_translate_addr_with_fc(u32 addr_in, u8 fc, bool rw, const int limit = 7
 {
 	u32 addr_out = 0;
 
-
-	MMULOG("%s: addr_in=%08x, fc=%d, ptest=%d, rw=%d, limit=%d\n",
-			__func__, addr_in, fc, ptest, rw, limit);
 	m_mmu_tmp_sr = 0;
 
 	m_mmu_last_logical_addr = addr_in;
@@ -564,11 +523,7 @@ u32 pmmu_translate_addr_with_fc(u32 addr_in, u8 fc, bool rw, const int limit = 7
 	if (!ptest && !pload && pmmu_atc_lookup<false>(addr_in, fc, rw, addr_out))
 	{
 		if ((m_mmu_tmp_sr & M68K_MMU_SR_BUS_ERROR) || (!rw && (m_mmu_tmp_sr & M68K_MMU_SR_WRITE_PROTECT)))
-		{
-			MMULOG("set atc hit buserror: addr_in=%08x, addr_out=%x, rw=%x, fc=%d, sz=%d\n",
-					addr_in, addr_out, m_mmu_tmp_rw, m_mmu_tmp_fc, m_mmu_tmp_sz);
 			pmmu_set_buserror(addr_in);
-		}
 		return addr_out;
 	}
 
@@ -601,10 +556,7 @@ u32 pmmu_translate_addr_with_fc(u32 addr_in, u8 fc, bool rw, const int limit = 7
 	{
 
 		if (!pload)
-		{
-			MMULOG("%s: set buserror (SR %04X)\n", __func__, m_mmu_tmp_sr);
 			pmmu_set_buserror(addr_in);
-		}
 	}
 
 	// it seems like at least the 68030 sets the M bit in the MMU SR
@@ -614,7 +566,6 @@ u32 pmmu_translate_addr_with_fc(u32 addr_in, u8 fc, bool rw, const int limit = 7
 	{
 		pmmu_atc_add(addr_in, addr_out, fc, rw && type != 1);
 	}
-	MMULOG("PMMU: [%08x] => [%08x] (SR %04x)\n", addr_in, addr_out, m_mmu_tmp_sr);
 	return addr_out;
 }
 
@@ -656,7 +607,6 @@ u32 pmmu_translate_addr_with_fc_040(u32 addr_in, u8 fc, u8 ptest)
 
 		if ((addr_in & mask) == (tt0 & mask) && (fc & fcmask[(tt0 >> 13) & 3]) == fcmatch[(tt0 >> 13) & 3])
 		{
-			MMULOG("TT0 match on address %08x (TT0 = %08x, mask = %08x)\n", addr_in, tt0, mask);
 			if ((tt0 & 4) && !m_mmu_tmp_rw && !ptest)   // write protect?
 			{
 				pmmu_set_buserror(addr_in);
@@ -676,7 +626,6 @@ u32 pmmu_translate_addr_with_fc_040(u32 addr_in, u8 fc, u8 ptest)
 
 		if ((addr_in & mask) == (tt1 & mask) && (fc & fcmask[(tt1 >> 13) & 3]) == fcmatch[(tt1 >> 13) & 3])
 		{
-			MMULOG("TT1 match on address %08x (TT0 = %08x, mask = %08x)\n", addr_in, tt1, mask);
 			if ((tt1 & 4) && !m_mmu_tmp_rw && !ptest)   // write protect?
 			{
 					pmmu_set_buserror(addr_in);
@@ -739,8 +688,6 @@ u32 pmmu_translate_addr_with_fc_040(u32 addr_in, u8 fc, u8 ptest)
 				m_program->write_dword(pointer_ptr, pointer_entry);
 			}
 
-			MMULOG("pointer entry = %08x\n", pointer_entry);
-
 			// write protected by the root or pointer entries?
 			if ((((root_entry & 4) && !m_mmu_tmp_rw) || ((pointer_entry & 4) && !m_mmu_tmp_rw)) && !ptest)
 			{
@@ -751,7 +698,6 @@ u32 pmmu_translate_addr_with_fc_040(u32 addr_in, u8 fc, u8 ptest)
 			// is UDT valid on the pointer entry?
 			if (!(pointer_entry & 2) && !ptest)
 			{
-				logerror("Invalid pointer entry!  PC=%x, addr=%x\n", m_ppc, addr_in);
 				pmmu_set_buserror(addr_in);
 				return addr_in;
 			}
@@ -760,8 +706,6 @@ u32 pmmu_translate_addr_with_fc_040(u32 addr_in, u8 fc, u8 ptest)
 		}
 		else // throw an error
 		{
-			logerror("Invalid root entry!  PC=%x, addr=%x\n", m_ppc, addr_in);
-
 			if (!ptest)
 			{
 				pmmu_set_buserror(addr_in);
@@ -776,21 +720,17 @@ u32 pmmu_translate_addr_with_fc_040(u32 addr_in, u8 fc, u8 ptest)
 			page_idx = (addr_in >> 13) & 0x1f;
 			page = addr_in & 0x1fff;
 			pointer_entry &= ~0x7f;
-			MMULOG("8k pages: index %x page %x\n", page_idx, page);
 		}
 		else    // 4k pages
 		{
 			page_idx = (addr_in >> 12) & 0x3f;
 			page = addr_in & 0xfff;
 			pointer_entry &= ~0xff;
-			MMULOG("4k pages: index %x page %x\n", page_idx, page);
 		}
 
 		page_ptr = pointer_entry + (page_idx<<2);
 		page_entry = m_program->read_dword(page_ptr);
 		m_mmu_last_page_entry_addr = page_ptr;
-
-		MMULOG("page_entry = %08x\n", page_entry);
 
 		// resolve indirect page pointers
 		while ((page_entry & 3) == 2)
@@ -810,7 +750,6 @@ u32 pmmu_translate_addr_with_fc_040(u32 addr_in, u8 fc, u8 ptest)
 		switch (page_entry & 3)
 		{
 			case 0: // invalid
-				MMULOG("Invalid page entry!  PC=%x, addr=%x\n", m_ppc, addr_in);
 				if (!ptest)
 				{
 					pmmu_set_buserror(addr_in);
@@ -858,7 +797,6 @@ u32 pmmu_translate_addr_with_fc_040(u32 addr_in, u8 fc, u8 ptest)
 				fatalerror("68040: got indirect final page pointer, shouldn't be possible\n");
 				break;
 		}
-		//      if (addr_in != addr_out) MMULOG("040MMU: [%08x] => [%08x]\n", addr_in, addr_out);
 	}
 
 	return addr_out;
@@ -931,8 +869,6 @@ void m68851_pload(const u32 ea, const u16 modes)
 	const int fc = fc_from_modes(modes);
 	bool rw = (modes & 0x200);
 
-	MMULOG("%s: PLOAD%c addr=%08x, fc=%d\n", __func__, rw ? 'R' : 'W', ltmp, fc);
-
 	// MC68851 traps if MMU is not enabled, 030 not
 	if (m_pmmu_enabled || (m_cpu_type & CPU_TYPE_030))
 	{
@@ -947,7 +883,6 @@ void m68851_pload(const u32 ea, const u16 modes)
 	}
 	else
 	{
-		MMULOG("PLOAD with MMU disabled on MC68851\n");
 		m68ki_exception_trap(57);
 		return;
 	}
@@ -962,10 +897,6 @@ void m68851_ptest(const u32 ea, const u16 modes)
 	const bool rw = (modes & 0x200);
 	const int fc = fc_from_modes(modes);
 
-	MMULOG("PMMU: PTEST%c (%04X) pc=%08x sp=%08x va=%08x fc=%x level=%x a=%d, areg=%d\n",
-			rw ? 'R' : 'W', modes, m_ppc, REG_A()[7], v_addr, fc, level,
-					(modes & 0x100) ? 1 : 0, (modes >> 5) & 7);
-
 	if (CPU_TYPE_IS_040_PLUS())
 	{
 		p_addr = pmmu_translate_addr_with_fc_040(v_addr, fc, 1);
@@ -977,7 +908,6 @@ void m68851_ptest(const u32 ea, const u16 modes)
 
 	m_mmu_sr = m_mmu_tmp_sr;
 
-	MMULOG("PMMU: PTEST result: %04x pa=%08x\n", m_mmu_sr, p_addr);
 	if (modes & 0x100)
 	{
 		int areg = (modes >> 5) & 7;
@@ -991,29 +921,23 @@ void m68851_pmove_get(u32 ea, u16 modes)
 	{
 	case 0x02: // transparent translation register 0
 		WRITE_EA_32(ea, m_mmu_tt0);
-		MMULOG("PMMU: pc=%x PMOVE from mmu_tt0=%08x\n", m_ppc, m_mmu_tt0);
 		break;
 	case 0x03: // transparent translation register 1
 		WRITE_EA_32(ea, m_mmu_tt1);
-		MMULOG("PMMU: pc=%x PMOVE from mmu_tt1=%08x\n", m_ppc, m_mmu_tt1);
 		break;
 	case 0x10:  // translation control register
 		WRITE_EA_32(ea, m_mmu_tc);
-		MMULOG("PMMU: pc=%x PMOVE from mmu_tc=%08x\n", m_ppc, m_mmu_tc);
 		break;
 
 	case 0x12: // supervisor root pointer
 		WRITE_EA_64(ea, (u64)m_mmu_srp_limit<<32 | (u64)m_mmu_srp_aptr);
-		MMULOG("PMMU: pc=%x PMOVE from SRP limit = %08x, aptr = %08x\n", m_ppc, m_mmu_srp_limit, m_mmu_srp_aptr);
 		break;
 
 	case 0x13: // CPU root pointer
 		WRITE_EA_64(ea, (u64)m_mmu_crp_limit<<32 | (u64)m_mmu_crp_aptr);
-		MMULOG("PMMU: pc=%x PMOVE from CRP limit = %08x, aptr = %08x\n", m_ppc, m_mmu_crp_limit, m_mmu_crp_aptr);
 		break;
 
 	default:
-		logerror("680x0: PMOVE from unknown MMU register %x, PC %x\n", (modes>>10) & 7, m_pc);
 		return;
 	}
 
@@ -1034,15 +958,9 @@ void m68851_pmove_put(u32 ea, u16 modes)
 		u32 temp = READ_EA_32(ea);
 
 		if (((modes >> 10) & 7) == 2)
-		{
-			MMULOG("WRITE TT0 = 0x%08x\n", m_mmu_tt0);
 			m_mmu_tt0 = temp;
-		}
 		else if (((modes >> 10) & 7) == 3)
-		{
-			MMULOG("WRITE TT1 = 0x%08x\n", m_mmu_tt1);
 			m_mmu_tt1 = temp;
-		}
 		break;
 
 		// FIXME: unreachable
@@ -1053,7 +971,6 @@ void m68851_pmove_put(u32 ea, u16 modes)
 	}
 	[[fallthrough]];
 	case 1:
-		logerror("680x0: unknown PMOVE case 1, PC %x\n", m_pc);
 		break;
 
 	case 2:
@@ -1061,7 +978,6 @@ void m68851_pmove_put(u32 ea, u16 modes)
 		{
 		case 0: // translation control register
 			m_mmu_tc = READ_EA_32(ea);
-			MMULOG("PMMU: TC = %08x\n", m_mmu_tc);
 
 			if (m_mmu_tc & 0x80000000)
 			{
@@ -1073,19 +989,14 @@ void m68851_pmove_put(u32 ea, u16 modes)
 
 				if (bits != 32 || !((m_mmu_tc >> 23) & 1))
 				{
-					logerror("MMU: TC invalid!\n");
 					m_mmu_tc &= ~0x80000000;
 					m68ki_exception_trap(EXCEPTION_MMU_CONFIGURATION);
 				} else {
 					m_pmmu_enabled = 1;
 				}
-				MMULOG("PMMU enabled\n");
 			}
 			else
-			{
 				m_pmmu_enabled = 0;
-				MMULOG("PMMU disabled\n");
-			}
 
 			if (!(modes & 0x100))   // flush ATC on moves to TC, SRP, CRP with FD bit clear
 			{
@@ -1097,7 +1008,6 @@ void m68851_pmove_put(u32 ea, u16 modes)
 			temp64 = READ_EA_64(ea);
 			m_mmu_srp_limit = (temp64 >> 32) & 0xffffffff;
 			m_mmu_srp_aptr = temp64 & 0xffffffff;
-			MMULOG("PMMU: SRP limit = %08x aptr = %08x\n", m_mmu_srp_limit, m_mmu_srp_aptr);
 			// SRP type 0 is not allowed
 			if ((m_mmu_srp_limit & 3) == 0)
 			{
@@ -1115,7 +1025,6 @@ void m68851_pmove_put(u32 ea, u16 modes)
 			temp64 = READ_EA_64(ea);
 			m_mmu_crp_limit = (temp64 >> 32) & 0xffffffff;
 			m_mmu_crp_aptr = temp64 & 0xffffffff;
-			MMULOG("PMMU: CRP limit = %08x aptr = %08x\n", m_mmu_crp_limit, m_mmu_crp_aptr);
 			// CRP type 0 is not allowed
 			if ((m_mmu_crp_limit & 3) == 0)
 			{
@@ -1131,26 +1040,14 @@ void m68851_pmove_put(u32 ea, u16 modes)
 
 		case 7: // MC68851 Access Control Register
 			if (m_cpu_type == CPU_TYPE_020)
-			{
-				// DomainOS on Apollo DN3000 will only reset this to 0
-				u16 mmu_ac = READ_EA_16(ea);
-				if (mmu_ac != 0)
-				{
-					MMULOG("680x0 PMMU: pc=%x PMOVE to mmu_ac=%08x\n",
-							m_ppc, mmu_ac);
-				}
 				break;
-			}
 			// fall through; unknown PMOVE mode unless MC68020 with MC68851
 			[[fallthrough]];
 		default:
-			logerror("680x0: PMOVE to unknown MMU register %x, PC %x\n", (modes>>10) & 7, m_pc);
 			break;
 		}
 		break;
 		case 3: // MMU status
-			u32 temp = READ_EA_32(ea);
-			logerror("680x0: unsupported PMOVE %x to MMU status, PC %x\n", temp, m_pc);
 			break;
 	}
 }
@@ -1175,18 +1072,15 @@ void m68851_pmove(u32 ea, u16 modes)
 	case 3: // MC68030 to/from status reg
 		if (modes & 0x200)
 		{
-			MMULOG("%s: read SR = %04x\n", __func__, m_mmu_sr);
 			WRITE_EA_16(ea, m_mmu_sr);
 		}
 		else
 		{
 			m_mmu_sr = READ_EA_16(ea);
-			MMULOG("%s: write SR = %04X\n", __func__, m_mmu_sr);
 		}
 		break;
 
 	default:
-		logerror("680x0: unknown PMOVE mode %x (modes %04x) (PC %x)\n", (modes >> 13) & 0x7, modes, m_pc);
 		break;
 
 	}
@@ -1200,18 +1094,11 @@ void m68851_mmu_ops()
 
 	// catch the 2 "weird" encodings up front (PBcc)
 	if ((m_ir & 0xffc0) == 0xf0c0)
-	{
-		logerror("680x0: unhandled PBcc\n");
 		return;
-	}
 	else if ((m_ir & 0xffc0) == 0xf080)
-	{
-		logerror("680x0: unhandled PBcc\n");
 		return;
-	}
 	else if ((m_ir & 0xffe0) == 0xf500)
 	{
-		MMULOG("68040 pflush: pc=%08x ir=%04x opmode=%d register=%d\n", m_ppc, m_ir, (m_ir >> 3) & 3, m_ir & 7);
 		pmmu_atc_flush();
 	}
 	else    // the rest are 1111000xxxXXXXXX where xxx is the instruction family
@@ -1237,15 +1124,9 @@ void m68851_mmu_ops()
 					return;
 				}
 				else if (modes == 0x2800)   // PVALID (FORMAT 1)
-				{
-					logerror("680x0: unhandled PVALID1\n");
 					return;
-				}
 				else if ((modes & 0xfff8) == 0x2c00)    // PVALID (FORMAT 2)
-				{
-					logerror("680x0: unhandled PVALID2\n");
 					return;
-				}
 				else if ((modes & 0xe000) == 0x8000)    // PTEST
 				{
 					m68851_ptest(ea, modes);
@@ -1258,7 +1139,6 @@ void m68851_mmu_ops()
 				break;
 
 			default:
-				logerror("680x0: unknown PMMU instruction group %d\n", (m_ir >> 9) & 0x7);
 				break;
 		}
 	}
@@ -1312,7 +1192,6 @@ int m68851_buserror(u32& addr)
 
 	if (m_mmu_tablewalk)
 	{
-		MMULOG("buserror during table walk\n");
 		m_mmu_tmp_sr |= M68K_MMU_SR_BUS_ERROR|M68K_MMU_SR_INVALID;
 		return true;
 	}

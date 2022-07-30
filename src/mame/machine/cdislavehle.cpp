@@ -40,7 +40,6 @@ DEFINE_DEVICE_TYPE(CDI_SLAVE_HLE, cdislave_hle_device, "cdislavehle", "CD-i Mono
 
 TIMER_CALLBACK_MEMBER( cdislave_hle_device::trigger_readback_int )
 {
-	LOGMASKED(LOG_IRQS, "Asserting IRQ2\n");
 	m_int_callback(ASSERT_LINE);
 	m_interrupt_timer->adjust(attotime::never);
 }
@@ -121,7 +120,6 @@ uint16_t cdislave_hle_device::slave_r(offs_t offset)
 	if (m_channel[offset].m_out_count)
 	{
 		uint8_t ret = m_channel[offset].m_out_buf[m_channel[offset].m_out_index];
-		LOGMASKED(LOG_READS, "%s: slave_r: Channel %d: %d, %02x\n", machine().describe_context(), offset, m_channel[offset].m_out_index, ret);
 		if (m_channel[offset].m_out_index == 0)
 		{
 			switch (m_channel[offset].m_out_cmd)
@@ -132,7 +130,6 @@ uint16_t cdislave_hle_device::slave_r(offs_t offset)
 				case 0xf3:
 				case 0xf4:
 				case 0xf7:
-					LOGMASKED(LOG_IRQS, "slave_r: De-asserting IRQ2\n");
 					m_int_callback(CLEAR_LINE);
 					break;
 			}
@@ -147,7 +144,6 @@ uint16_t cdislave_hle_device::slave_r(offs_t offset)
 		}
 		return ret;
 	}
-	LOGMASKED(LOG_READS, "slave_r: Channel %d: %d (nothing to output)\n", offset, m_channel[offset].m_out_index);
 	return 0xff;
 }
 
@@ -159,7 +155,6 @@ void cdislave_hle_device::set_mouse_position()
 
 void cdislave_hle_device::slave_w(offs_t offset, uint16_t data)
 {
-	LOGMASKED(LOG_WRITES, "slave_w: Channel %d: %d = %02x\n", offset, m_in_index, data & 0x00ff);
 	switch (offset)
 	{
 		case 0:
@@ -201,11 +196,9 @@ void cdislave_hle_device::slave_w(offs_t offset, uint16_t data)
 					case 0xe8: case 0xe9: case 0xea: case 0xeb: case 0xec: case 0xed: case 0xee: case 0xef:
 					case 0xf0: case 0xf1: case 0xf2: case 0xf3: case 0xf4: case 0xf5: case 0xf6: case 0xf7:
 					case 0xf8: case 0xf9: case 0xfa: case 0xfb: case 0xfc: case 0xfd: case 0xfe: case 0xff:
-						LOGMASKED(LOG_COMMANDS, "slave_w: Channel %d: Update Mouse Position (0x%02x)\n", offset, data & 0x00ff);
 						m_in_count = 3;
 						break;
 					default:
-						LOGMASKED(LOG_COMMANDS | LOG_UNKNOWNS, "slave_w: Channel %d: Unknown register: %02x\n", offset, data & 0x00ff);
 						m_in_index = 0;
 						break;
 				}
@@ -239,7 +232,6 @@ void cdislave_hle_device::slave_w(offs_t offset, uint16_t data)
 				switch (data & 0x00ff)
 				{
 					default:
-						LOGMASKED(LOG_COMMANDS | LOG_UNKNOWNS, "slave_w: Channel %d: Unknown register: %02x\n", offset, data & 0x00ff);
 						memset(m_in_buf, 0, 17);
 						m_in_index = 0;
 						m_in_count = 0;
@@ -276,7 +268,6 @@ void cdislave_hle_device::slave_w(offs_t offset, uint16_t data)
 				{
 					case 0x82: // Mute Audio
 					{
-						LOGMASKED(LOG_COMMANDS, "slave_w: Channel %d: Mute Audio (0x82)\n", offset);
 						m_dmadac[0]->set_volume(0);
 						m_dmadac[1]->set_volume(0);
 						m_in_index = 0;
@@ -286,7 +277,6 @@ void cdislave_hle_device::slave_w(offs_t offset, uint16_t data)
 					}
 					case 0x83: // Unmute Audio
 					{
-						LOGMASKED(LOG_COMMANDS, "slave_w: Channel %d: Unmute Audio (0x83)\n", offset);
 						m_dmadac[0]->set_volume(0x100);
 						m_dmadac[1]->set_volume(0x100);
 						m_in_index = 0;
@@ -294,11 +284,9 @@ void cdislave_hle_device::slave_w(offs_t offset, uint16_t data)
 						break;
 					}
 					case 0xf0: // Set Front Panel LCD
-						LOGMASKED(LOG_COMMANDS, "slave_w: Channel %d: Set Front Panel LCD (0xf0)\n", offset);
 						m_in_count = 17;
 						break;
 					default:
-						LOGMASKED(LOG_COMMANDS | LOG_UNKNOWNS, "slave_w: Channel %d: Unknown register: %02x\n", offset, data & 0x00ff);
 						memset(m_in_buf, 0, 17);
 						m_in_index = 0;
 						m_in_count = 0;
@@ -342,45 +330,36 @@ void cdislave_hle_device::slave_w(offs_t offset, uint16_t data)
 				switch (data & 0x00ff)
 				{
 					case 0xb0: // Request Disc Status
-						LOGMASKED(LOG_COMMANDS | LOG_WRITES, "slave_w: Channel %d: Request Disc Status (0xb0)\n", offset);
 						m_in_count = 4;
 						break;
 					case 0xb1: // Request Disc Base
-						LOGMASKED(LOG_COMMANDS | LOG_WRITES, "slave_w: Channel %d: Request Disc Base (0xb1)\n", offset);
 						m_in_count = 4;
 						break;
 					case 0xf0: // Request SLAVE Revision
-						LOGMASKED(LOG_COMMANDS | LOG_WRITES, "slave_w: Channel %d: Request SLAVE Revision (0xf0)\n", offset);
 						prepare_readback(attotime::from_hz(10000), 2, 2, 0xf0, 0x32, 0x31, 0, 0xf0);
 						m_in_index = 0;
 						break;
 					case 0xf3: // Request Pointer Type
-						LOGMASKED(LOG_COMMANDS | LOG_WRITES, "slave_w: Channel %d: Request Pointer Type (0xf3)\n", offset);
 						m_in_index = 0;
 						prepare_readback(attotime::from_hz(10000), 2, 2, 0xf3, 1, 0, 0, 0xf3);
 						break;
 					case 0xf4: // Request Test Plug Status
-						LOGMASKED(LOG_COMMANDS | LOG_WRITES, "slave_w: Channel %d: Request Test Plug Status (0xf4)\n", offset);
 						m_in_index = 0;
 						prepare_readback(attotime::from_hz(10000), 2, 2, 0xf4, 0, 0, 0, 0xf4);
 						break;
 					case 0xf6: // Request NTSC/PAL Status
-						LOGMASKED(LOG_COMMANDS | LOG_WRITES, "slave_w: Channel %d: Request NTSC/PAL Status (0xf6)\n", offset);
 						prepare_readback(attotime::never, 2, 2, 0xf6, 2, 0, 0, 0xf6);
 						m_in_index = 0;
 						break;
 					case 0xf7: // Enable Input Polling
-						LOGMASKED(LOG_COMMANDS | LOG_WRITES, "slave_w: Channel %d: Activate Input Polling (0xf7)\n", offset);
 						m_polling_active = 1;
 						m_in_index = 0;
 						break;
 					case 0xfa: // Enable X-Bus Interrupts
-						LOGMASKED(LOG_COMMANDS | LOG_WRITES, "slave_w: Channel %d: X-Bus Interrupt Enable (0xfa)\n", offset);
 						m_xbus_interrupt_enable = 1;
 						m_in_index = 0;
 						break;
 					default:
-						LOGMASKED(LOG_COMMANDS | LOG_UNKNOWNS, "slave_w: Channel %d: Unknown register: %02x\n", offset, data & 0x00ff);
 						memset(m_in_buf, 0, 17);
 						m_in_index = 0;
 						m_in_count = 0;

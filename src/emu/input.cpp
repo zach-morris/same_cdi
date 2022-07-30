@@ -595,7 +595,6 @@ input_manager::~input_manager()
 
 s32 input_manager::code_value(input_code code)
 {
-	g_profiler.start(PROFILER_INPUT);
 	s32 result = 0;
 
 	// dummy loop to allow clean early exits
@@ -654,7 +653,6 @@ s32 input_manager::code_value(input_code code)
 	} while (0);
 
 	// stop the profiler before exiting
-	g_profiler.stop();
 	return result;
 }
 
@@ -1305,7 +1303,6 @@ void input_manager::seq_from_tokens(input_seq &seq, std::string_view string)
 		{
 			if (code.device_class() < DEVICE_CLASS_FIRST_VALID)
 			{
-				osd_printf_warning("Input: Dropping invalid input token %s\n", token);
 				while (operators)
 				{
 					seq.backspace();
@@ -1379,8 +1376,6 @@ bool input_manager::map_device_to_controller(const devicemap_table &table)
 			{
 				// remap devindex
 				input_devclass->remap_device_index(device->devindex(), devindex);
-				osd_printf_verbose("Input: Remapped %s #%d: %s (device id: %s)\n", input_devclass->name(), devindex, device->name(), device->id());
-
 				break;
 			}
 		}
