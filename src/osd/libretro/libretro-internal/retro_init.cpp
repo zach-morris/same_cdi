@@ -111,6 +111,12 @@ int opt_type[NB_OPTPATH]={ // 0 for save_dir | 1 for system_dir
     1,1,1,1
 };
 
+int opt_game_dir[NB_OPTPATH]={ // 0 for dont add gamename directory | 1 for add gamename directory
+    0,1/*,0*/,0,
+    0,0,0,0,
+    0,0,0,0
+};
+
 
 //============================================================
 //  main
@@ -393,10 +399,20 @@ static void Set_Path_Option(void)
 
       if(opt_type[i] == 0)
       {
-         if (retro_save_directory)
-            sprintf(tmp_dir, "%s%c%s%c%s", retro_save_directory, slash, core, slash,dir_name[i]);
+          if(opt_game_dir[i] == 0)
+         {
+            if (retro_save_directory)
+               sprintf(tmp_dir, "%s%c%s%c%s", retro_save_directory, slash, core, slash,dir_name[i]);
+            else
+               sprintf(tmp_dir, "%s%c%s%c%s%c", ".", slash, core, slash,dir_name[i],slash);
+         }
          else
-            sprintf(tmp_dir, "%s%c%s%c%s%c", ".", slash, core, slash,dir_name[i],slash);
+         {
+            if (retro_save_directory)
+               sprintf(tmp_dir, "%s%c%s%c%s%c%s",retro_save_directory,slash,core,slash,dir_name[i],slash,MgameName); //save nvram to game specific dirs
+            else
+               sprintf(tmp_dir, "%s%c%s%c%s%c%s%c",".",slash,core,slash,dir_name[i],slash,MgameName,slash);   
+         }
       }
       else
       {
