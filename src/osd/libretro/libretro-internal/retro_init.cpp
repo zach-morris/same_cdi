@@ -51,7 +51,7 @@ int  lightgun_mode = RETRO_SETTING_LIGHTGUN_MODE_DISABLED;
 bool cheats_enable = false;
 bool alternate_renderer = false;
 bool boot_to_osd_enable = false;
-bool boot_to_bios_enable = false;
+// bool boot_to_bios_enable = false;
 bool experimental_cmdline = false;
 bool softlist_enable = true;
 bool softlist_auto = false;
@@ -60,6 +60,7 @@ bool read_config_enable = false;
 bool auto_save_enable = false;
 bool throttle_enable = false;
 bool game_specific_saves_enable = false;
+bool game_specific_nvram_enable = true;
 bool buttons_profiles = true;
 bool mame_paths_enable = false;
 bool mame_4way_enable = false;
@@ -409,9 +410,15 @@ static void Set_Path_Option(void)
          else
          {
             if (retro_save_directory)
-               sprintf(tmp_dir, "%s%c%s%c%s%c%s",retro_save_directory,slash,core,slash,dir_name[i],slash,MgameName); //save nvram to game specific dirs
+               if (game_specific_nvram_enable)
+                  sprintf(tmp_dir, "%s%c%s%c%s%c%s",retro_save_directory,slash,core,slash,dir_name[i],slash,MgameName); //save nvram to game specific dirs
+               else
+                  sprintf(tmp_dir, "%s%c%s%c%s", retro_save_directory, slash, core, slash,dir_name[i]);
             else
-               sprintf(tmp_dir, "%s%c%s%c%s%c%s%c",".",slash,core,slash,dir_name[i],slash,MgameName,slash);   
+               if (game_specific_nvram_enable)
+                  sprintf(tmp_dir, "%s%c%s%c%s%c%s%c",".",slash,core,slash,dir_name[i],slash,MgameName,slash);   
+               else
+                  sprintf(tmp_dir, "%s%c%s%c%s%c", ".", slash, core, slash,dir_name[i],slash);
          }
       }
       else
